@@ -10,6 +10,12 @@ import SwiftUI
 struct DNSSectionView: View {
     let samples: [DNSSample]
 
+    private var sortedSamples: [DNSSample] {
+        samples.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("DNS")
@@ -20,7 +26,7 @@ struct DNSSectionView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                    ForEach(samples, id: \DNSSample.name) { sample in
+                    ForEach(sortedSamples, id: \DNSSample.name) { sample in
                         DNSRowView(sample: sample)
                     }
                 }
@@ -36,7 +42,7 @@ private struct DNSRowView: View {
         GridRow {
             StatusDot(ok: sample.ok)
             VStack(alignment: .leading, spacing: 2) {
-                Text(sample.name)
+                Text(sample.displayName ?? sample.name)
                     .fontWeight(.medium)
                 Text(sample.hostname ?? "-")
                     .foregroundStyle(.secondary)

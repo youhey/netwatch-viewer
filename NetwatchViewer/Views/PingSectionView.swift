@@ -10,6 +10,12 @@ import SwiftUI
 struct PingSectionView: View {
     let samples: [PingSample]
 
+    private var sortedSamples: [PingSample] {
+        samples.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ping")
@@ -20,7 +26,7 @@ struct PingSectionView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                    ForEach(samples, id: \PingSample.name) { sample in
+                    ForEach(sortedSamples, id: \PingSample.name) { sample in
                         PingRowView(sample: sample)
                     }
                 }
@@ -36,7 +42,7 @@ private struct PingRowView: View {
     var body: some View {
         GridRow {
             StatusDot(ok: sample.ok)
-            Text(sample.name)
+            Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
             Text(sample.target ?? "-")
                 .foregroundStyle(.secondary)

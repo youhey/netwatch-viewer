@@ -205,10 +205,10 @@ final class ChartsViewModel: ObservableObject {
     }
 
     private func apply(overview: ChartsOverviewResponse) {
-        pingSeries = overview.ping
-        httpSeries = overview.http
-        downloadSeries = overview.download
-        serviceSeries = overview.serviceGroups
+        pingSeries = sortedPingSeries(overview.ping)
+        httpSeries = sortedHTTPSeries(overview.http)
+        downloadSeries = sortedDownloadSeries(overview.download)
+        serviceSeries = sortedServiceSeries(overview.serviceGroups)
         metadata = ChartsMetadata(overview: overview)
         lastUpdated = Date()
     }
@@ -259,10 +259,10 @@ final class ChartsViewModel: ObservableObject {
         }
 
         if !nextPingSeries.isEmpty || !nextHTTPSeries.isEmpty || !nextDownloadSeries.isEmpty || !nextServiceSeries.isEmpty {
-            pingSeries = nextPingSeries
-            httpSeries = nextHTTPSeries
-            downloadSeries = nextDownloadSeries
-            serviceSeries = nextServiceSeries
+            pingSeries = sortedPingSeries(nextPingSeries)
+            httpSeries = sortedHTTPSeries(nextHTTPSeries)
+            downloadSeries = sortedDownloadSeries(nextDownloadSeries)
+            serviceSeries = sortedServiceSeries(nextServiceSeries)
             metadata = ChartsMetadata(
                 generatedAt: [nextPingSeries.first?.generatedAt, nextHTTPSeries.first?.generatedAt, nextDownloadSeries.first?.generatedAt, nextServiceSeries.first?.generatedAt].compactMap { $0 }.first,
                 actualRangeStart: [nextPingSeries.first?.actualRangeStart, nextHTTPSeries.first?.actualRangeStart, nextDownloadSeries.first?.actualRangeStart, nextServiceSeries.first?.actualRangeStart].compactMap { $0 }.first,
@@ -294,22 +294,70 @@ final class ChartsViewModel: ObservableObject {
     }
 
     private var pingNamesForFallback: [String] {
-        let names = catalog?.ping.map(\.name) ?? []
+        let names = sortedCatalogPingTargets(catalog?.ping ?? []).map(\.name)
         return names.isEmpty ? legacyFallbackPingNames : names
     }
 
     private var httpNamesForFallback: [String] {
-        let names = catalog?.http.map(\.name) ?? []
+        let names = sortedCatalogHTTPTargets(catalog?.http ?? []).map(\.name)
         return names.isEmpty ? legacyFallbackHTTPNames : names
     }
 
     private var serviceGroupsForFallback: [String] {
-        let groups = catalog?.serviceGroups.map(\.group) ?? []
+        let groups = sortedCatalogServiceGroups(catalog?.serviceGroups ?? []).map(\.group)
         return groups.isEmpty ? legacyFallbackServiceGroups : groups
     }
 
     private var downloadNamesForFallback: [String] {
-        catalog?.download.map(\.name) ?? []
+        sortedCatalogDownloadTargets(catalog?.download ?? []).map(\.name)
+    }
+
+    private func sortedPingSeries(_ series: [PingChartSeries]) -> [PingChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedHTTPSeries(_ series: [HTTPChartSeries]) -> [HTTPChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedDownloadSeries(_ series: [DownloadChartSeries]) -> [DownloadChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedServiceSeries(_ series: [ServiceChartSeries]) -> [ServiceChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.group) < (rhs.displayOrder ?? Int.max, rhs.group)
+        }
+    }
+
+    private func sortedCatalogPingTargets(_ targets: [ChartCatalogPingTarget]) -> [ChartCatalogPingTarget] {
+        targets.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedCatalogHTTPTargets(_ targets: [ChartCatalogHTTPTarget]) -> [ChartCatalogHTTPTarget] {
+        targets.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedCatalogDownloadTargets(_ targets: [ChartCatalogDownloadTarget]) -> [ChartCatalogDownloadTarget] {
+        targets.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedCatalogServiceGroups(_ groups: [ChartCatalogServiceGroup]) -> [ChartCatalogServiceGroup] {
+        groups.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.group) < (rhs.displayOrder ?? Int.max, rhs.group)
+        }
     }
 
     private func clampedMaxPoints(_ value: Int) -> Int {

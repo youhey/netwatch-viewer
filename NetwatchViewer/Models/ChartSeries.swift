@@ -65,6 +65,8 @@ struct PingChartSeries: Decodable, Identifiable {
 
     let type: String
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let target: String?
     let generatedAt: Date?
     let actualRangeStart: Date?
@@ -79,6 +81,8 @@ struct PingChartSeries: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case type
         case name
+        case displayName
+        case displayOrder
         case target
         case generatedAt
         case actualRangeStart
@@ -95,6 +99,8 @@ struct PingChartSeries: Decodable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(String.self, forKey: .type)
         name = try container.decode(String.self, forKey: .name)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         target = try container.decodeIfPresent(String.self, forKey: .target)
         generatedAt = ChartDateParser.parse(try container.decodeIfPresent(String.self, forKey: .generatedAt))
         actualRangeStart = ChartDateParser.parse(try container.decodeIfPresent(String.self, forKey: .actualRangeStart))
@@ -139,6 +145,8 @@ struct HTTPChartSeries: Decodable, Identifiable {
 
     let type: String
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let group: String?
     let category: String?
     let url: String?
@@ -155,6 +163,8 @@ struct HTTPChartSeries: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case type
         case name
+        case displayName
+        case displayOrder
         case group
         case category
         case url
@@ -173,6 +183,8 @@ struct HTTPChartSeries: Decodable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(String.self, forKey: .type)
         name = try container.decode(String.self, forKey: .name)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         group = try container.decodeIfPresent(String.self, forKey: .group)
         category = try container.decodeIfPresent(String.self, forKey: .category)
         url = try container.decodeIfPresent(String.self, forKey: .url)
@@ -221,6 +233,8 @@ struct ServiceChartSeries: Decodable, Identifiable {
 
     let type: String
     let group: String
+    let displayName: String?
+    let displayOrder: Int?
     let category: String?
     let generatedAt: Date?
     let actualRangeStart: Date?
@@ -236,6 +250,8 @@ struct ServiceChartSeries: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case type
         case group
+        case displayName
+        case displayOrder
         case category
         case generatedAt
         case actualRangeStart
@@ -253,6 +269,8 @@ struct ServiceChartSeries: Decodable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(String.self, forKey: .type)
         group = try container.decode(String.self, forKey: .group)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         category = try container.decodeIfPresent(String.self, forKey: .category)
         generatedAt = ChartDateParser.parse(try container.decodeIfPresent(String.self, forKey: .generatedAt))
         actualRangeStart = ChartDateParser.parse(try container.decodeIfPresent(String.self, forKey: .actualRangeStart))

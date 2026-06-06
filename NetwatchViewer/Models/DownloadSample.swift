@@ -29,6 +29,8 @@ struct DownloadSample: Codable, Identifiable {
     let ts: Date
     let type: String?
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let ok: Bool
     let url: String?
     let httpStatus: Int?
@@ -43,6 +45,8 @@ struct DownloadSample: Codable, Identifiable {
         case ts
         case type
         case name
+        case displayName
+        case displayOrder
         case ok
         case url
         case httpStatus
@@ -65,6 +69,8 @@ struct DownloadSample: Codable, Identifiable {
         ts = parsedTS
         type = try container.decodeIfPresent(String.self, forKey: .type)
         name = try container.decode(String.self, forKey: .name)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        displayOrder = try container.decodeIfPresent(Int.self, forKey: .displayOrder)
         ok = try container.decodeIfPresent(Bool.self, forKey: .ok) ?? false
         url = try container.decodeIfPresent(String.self, forKey: .url)
         httpStatus = try container.decodeIfPresent(Int.self, forKey: .httpStatus)
@@ -81,6 +87,8 @@ struct DownloadSample: Codable, Identifiable {
         try container.encode(ts, forKey: .ts)
         try container.encodeIfPresent(type, forKey: .type)
         try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(displayName, forKey: .displayName)
+        try container.encodeIfPresent(displayOrder, forKey: .displayOrder)
         try container.encode(ok, forKey: .ok)
         try container.encodeIfPresent(url, forKey: .url)
         try container.encodeIfPresent(httpStatus, forKey: .httpStatus)

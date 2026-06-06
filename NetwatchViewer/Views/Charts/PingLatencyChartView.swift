@@ -32,7 +32,7 @@ struct PingLatencyChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-avg-\(point.ts.timeIntervalSince1970)",
-                    series: labels[series.name] ?? series.name,
+                    series: series.displayName ?? labels[series.name] ?? series.name,
                     ts: point.ts,
                     value: value
                 )
@@ -69,7 +69,7 @@ struct PingLatencyChartView: View {
 
     private var pingLabels: [String: String] {
         Dictionary(uniqueKeysWithValues: (catalog?.ping ?? []).map { target in
-            (target.name, target.label ?? target.name)
+            (target.name, target.displayName ?? target.label ?? target.name)
         })
     }
 }

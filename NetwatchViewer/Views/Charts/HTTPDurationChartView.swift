@@ -32,7 +32,7 @@ struct HTTPDurationChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-total-\(point.ts.timeIntervalSince1970)",
-                    series: "\(labels[series.name] ?? series.name) total",
+                    series: "\(series.displayName ?? labels[series.name] ?? series.name) total",
                     ts: point.ts,
                     value: value
                 )
@@ -51,7 +51,7 @@ struct HTTPDurationChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-ttfb-\(point.ts.timeIntervalSince1970)",
-                    series: "\(labels[series.name] ?? series.name) ttfb",
+                    series: "\(series.displayName ?? labels[series.name] ?? series.name) ttfb",
                     ts: point.ts,
                     value: value
                 )
@@ -92,7 +92,7 @@ struct HTTPDurationChartView: View {
 
     private var httpLabels: [String: String] {
         Dictionary(uniqueKeysWithValues: (catalog?.http ?? []).map { target in
-            (target.name, target.label ?? target.name)
+            (target.name, target.displayName ?? target.label ?? target.name)
         })
     }
 }

@@ -23,7 +23,7 @@ struct ServiceGroupChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.group)-total-\(point.ts.timeIntervalSince1970)",
-                    series: labels[series.group] ?? series.group,
+                    series: series.displayName ?? labels[series.group] ?? series.group,
                     ts: point.ts,
                     value: value
                 )
@@ -46,7 +46,7 @@ struct ServiceGroupChartView: View {
 
     private var serviceGroupLabels: [String: String] {
         Dictionary(uniqueKeysWithValues: (catalog?.serviceGroups ?? []).map { group in
-            (group.group, group.label ?? group.group)
+            (group.group, group.displayName ?? group.label ?? group.group)
         })
     }
 }

@@ -10,6 +10,12 @@ import SwiftUI
 struct DownloadSectionView: View {
     let samples: [DownloadSample]
 
+    private var sortedSamples: [DownloadSample] {
+        samples.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Download")
@@ -20,7 +26,7 @@ struct DownloadSectionView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                    ForEach(samples, id: \DownloadSample.name) { sample in
+                    ForEach(sortedSamples, id: \DownloadSample.name) { sample in
                         DownloadRowView(sample: sample)
                     }
                 }
@@ -36,7 +42,7 @@ private struct DownloadRowView: View {
     var body: some View {
         GridRow {
             StatusDot(ok: sample.ok)
-            Text(sample.name)
+            Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
             Text(formatMbps(sample.mbps))
                 .foregroundStyle(sample.ok ? Color.primary : Color.red)

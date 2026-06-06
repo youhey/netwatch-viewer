@@ -24,7 +24,7 @@ struct DownloadThroughputChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-avg-\(point.ts.timeIntervalSince1970)",
-                    series: labels[series.name] ?? series.name,
+                    series: series.displayName ?? labels[series.name] ?? series.name,
                     ts: point.ts,
                     value: value
                 )
@@ -48,7 +48,7 @@ struct DownloadThroughputChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-max-\(point.ts.timeIntervalSince1970)",
-                    series: "\(labels[series.name] ?? series.name) max",
+                    series: "\(series.displayName ?? labels[series.name] ?? series.name) max",
                     ts: point.ts,
                     value: value
                 )
@@ -70,7 +70,7 @@ struct DownloadThroughputChartView: View {
                 marks.append(
                     DownloadThresholdMark(
                         id: "\(series.name)-warning",
-                        title: "\(labels[series.name] ?? series.name) warning",
+                        title: "\(series.displayName ?? labels[series.name] ?? series.name) warning",
                         value: warning,
                         color: .orange
                     )
@@ -81,7 +81,7 @@ struct DownloadThroughputChartView: View {
                 marks.append(
                     DownloadThresholdMark(
                         id: "\(series.name)-critical",
-                        title: "\(labels[series.name] ?? series.name) critical",
+                        title: "\(series.displayName ?? labels[series.name] ?? series.name) critical",
                         value: critical,
                         color: .red
                     )
@@ -139,7 +139,7 @@ struct DownloadThroughputChartView: View {
 
     private var downloadLabels: [String: String] {
         Dictionary(uniqueKeysWithValues: (catalog?.download ?? []).map { target in
-            (target.name, target.label ?? target.name)
+            (target.name, target.displayName ?? target.label ?? target.name)
         })
     }
 }

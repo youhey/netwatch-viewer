@@ -73,6 +73,8 @@ struct ChartCatalogPingTarget: Decodable, Identifiable {
     var id: String { name }
 
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let target: String?
     let label: String?
 }
@@ -81,6 +83,8 @@ struct ChartCatalogDNSTarget: Decodable, Identifiable {
     var id: String { name }
 
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let hostname: String?
     let label: String?
 }
@@ -89,6 +93,8 @@ struct ChartCatalogHTTPTarget: Decodable, Identifiable {
     var id: String { name }
 
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let group: String?
     let category: String?
     let url: String?
@@ -99,6 +105,8 @@ struct ChartCatalogDownloadTarget: Decodable, Identifiable {
     var id: String { name }
 
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let url: String?
     let expectedBytes: Int?
     let label: String?
@@ -108,6 +116,8 @@ struct ChartCatalogServiceGroup: Decodable, Identifiable {
     var id: String { group }
 
     let group: String
+    let displayName: String?
+    let displayOrder: Int?
     let category: String?
     let label: String?
 }

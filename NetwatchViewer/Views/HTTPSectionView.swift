@@ -10,6 +10,12 @@ import SwiftUI
 struct HTTPSectionView: View {
     let samples: [HTTPSample]
 
+    private var sortedSamples: [HTTPSample] {
+        samples.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Services")
@@ -20,7 +26,7 @@ struct HTTPSectionView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                    ForEach(samples, id: \HTTPSample.name) { sample in
+                    ForEach(sortedSamples, id: \HTTPSample.name) { sample in
                         HTTPRowView(sample: sample)
                     }
                 }
@@ -36,7 +42,7 @@ private struct HTTPRowView: View {
     var body: some View {
         GridRow {
             StatusDot(ok: sample.ok)
-            Text(sample.name)
+            Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
             Text(sample.group ?? "-")
                 .foregroundStyle(.secondary)

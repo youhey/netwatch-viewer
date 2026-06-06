@@ -35,6 +35,8 @@ struct PingSample: Codable, Identifiable {
     let ts: String
     let type: String
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let ok: Bool
     let target: String?
     let sent: Int?
@@ -51,6 +53,8 @@ struct DNSSample: Codable, Identifiable {
     let ts: String
     let type: String
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let ok: Bool
     let hostname: String?
     let durationMs: Double?
@@ -63,6 +67,8 @@ struct HTTPSample: Codable, Identifiable {
     let ts: String
     let type: String
     let name: String
+    let displayName: String?
+    let displayOrder: Int?
     let group: String?
     let category: String?
     let ok: Bool
