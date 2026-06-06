@@ -61,7 +61,7 @@ final class NotificationManager: ObservableObject {
         }
         content.sound = .default
 
-        let identifier = "netwatch.\(status.statusId ?? normalizedLevel(status.level))"
+        let identifier = "netwatch.\(status.statusId ?? normalizedLevel(status.level)).\(UUID().uuidString)"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
 
         try await center.add(request)

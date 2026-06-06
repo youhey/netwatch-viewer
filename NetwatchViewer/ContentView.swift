@@ -115,6 +115,7 @@ struct ContentView: View {
                 }
 
                 monitoringReasons(monitoringStatus)
+                alertStateDetails
             } else {
                 Text("No status loaded.")
                     .foregroundStyle(.secondary)
@@ -159,6 +160,23 @@ struct ContentView: View {
         .padding(.top, 4)
     }
 
+    private var alertStateDetails: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Alert State")
+                .font(.headline)
+
+            statusRow(label: "Observed ID", value: viewModel.alertState.lastObservedStatusId ?? "-")
+            statusRow(label: "Observed", value: viewModel.alertState.lastObservedLevel?.rawValue ?? "-")
+            statusRow(label: "Notified ID", value: viewModel.alertState.lastNotifiedStatusId ?? "-")
+            statusRow(label: "Notified", value: formatOptionalDate(viewModel.alertState.lastNotifiedAt))
+            statusRow(label: "Ack ID", value: viewModel.alertState.acknowledgedStatusId ?? "-")
+            statusRow(label: "Muted", value: formatOptionalDate(viewModel.alertState.mutedUntil))
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.top, 4)
+    }
+
     private func sortedReasons(_ reasons: [MonitoringReason]) -> [MonitoringReason] {
         reasons.sorted { lhs, rhs in
             (lhs.level.sortPriority, lhs.code, lhs.target ?? "", lhs.metric ?? "") < (rhs.level.sortPriority, rhs.code, rhs.target ?? "", rhs.metric ?? "")
@@ -171,6 +189,14 @@ struct ContentView: View {
         }
 
         return lastUpdated.formatted(date: .omitted, time: .standard)
+    }
+
+    private func formatOptionalDate(_ date: Date?) -> String {
+        guard let date else {
+            return "-"
+        }
+
+        return date.formatted(date: .omitted, time: .standard)
     }
 
     private func statusRow(label: String, value: String) -> some View {

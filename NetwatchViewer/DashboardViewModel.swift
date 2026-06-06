@@ -18,23 +18,26 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var notificationAuthorizationStatus = "Unknown"
     @Published private(set) var lastNotificationDate: Date?
     @Published private(set) var notificationErrorMessage: String?
+    @Published private(set) var alertState: AlertState
 
     private let client: NetwatchClient
     private let notificationManager: NotificationManager
+    private let alertController: AlertController
     private let refreshInterval: Duration
     private var refreshTask: Task<Void, Never>?
-    private var lastNotifiedStatusId: String?
-    private var lastObservedStatusId: String?
-    private var lastObservedLevel: MonitoringLevel?
 
     init(
         client: NetwatchClient? = nil,
         notificationManager: NotificationManager? = nil,
+        alertController: AlertController? = nil,
         refreshInterval: Duration = .seconds(10),
         requestNotificationsOnInit: Bool = true
     ) {
         self.client = client ?? NetwatchClient()
         self.notificationManager = notificationManager ?? NotificationManager()
+        let resolvedAlertController = alertController ?? AlertController()
+        self.alertController = resolvedAlertController
+        alertState = resolvedAlertController.state
         self.refreshInterval = refreshInterval
 
         if requestNotificationsOnInit {
@@ -83,12 +86,12 @@ final class DashboardViewModel: ObservableObject {
         var didUpdate = false
 
         do {
-            let previousLevel = lastObservedLevel ?? monitoringStatus?.level
             let status = try await client.fetchMonitoringStatus()
             monitoringStatus = status
             didUpdate = true
-            await notifyIfNeeded(previousLevel: previousLevel, status: status)
-            updateObservedStatus(status)
+            await notifyIfNeeded(status: status)
+            alertController.recordObserved(status)
+            syncAlertState()
         } catch {
             errors.append("Status: \(error.localizedDescription)")
         }
@@ -126,59 +129,58 @@ final class DashboardViewModel: ObservableObject {
         syncNotificationState()
     }
 
-    private func notifyIfNeeded(previousLevel: MonitoringLevel?, status: MonitoringStatus) async {
-        if status.level == .ok {
-            lastNotifiedStatusId = nil
+    func acknowledgeCurrentAlert() {
+        guard let monitoringStatus else {
+            return
         }
 
-        guard shouldNotify(previousLevel: previousLevel, status: status) else {
+        alertController.acknowledge(status: monitoringStatus)
+        syncAlertState()
+    }
+
+    func muteAlertsForOneHour() {
+        alertController.mute()
+        syncAlertState()
+    }
+
+    func unmuteAlerts() {
+        alertController.unmute()
+        syncAlertState()
+    }
+
+    func isCurrentAlertAcknowledged() -> Bool {
+        alertController.isAcknowledged(status: monitoringStatus)
+    }
+
+    func isMuted() -> Bool {
+        alertController.isMuted()
+    }
+
+    private func notifyIfNeeded(status: MonitoringStatus) async {
+        let now = Date()
+
+        guard alertController.shouldNotify(status: status, now: now) else {
             return
         }
 
         do {
             try await notificationManager.notify(status: status)
+            alertController.recordNotification(status: status, now: now)
             notificationErrorMessage = nil
         } catch {
             notificationErrorMessage = "Notifications: \(error.localizedDescription)"
         }
 
-        if let statusId = status.statusId {
-            lastNotifiedStatusId = statusId
-        }
-
         syncNotificationState()
-    }
-
-    private func shouldNotify(previousLevel: MonitoringLevel?, status: MonitoringStatus) -> Bool {
-        guard status.alert else {
-            return false
-        }
-
-        guard status.level == .warning || status.level == .critical else {
-            return false
-        }
-
-        if let statusId = status.statusId {
-            return statusId != lastNotifiedStatusId
-        }
-
-        switch status.level {
-        case .critical:
-            return previousLevel != .critical
-        case .warning:
-            return previousLevel != .warning && previousLevel != .critical
-        case .ok, .unknown:
-            return false
-        }
-    }
-
-    private func updateObservedStatus(_ status: MonitoringStatus) {
-        lastObservedStatusId = status.statusId
-        lastObservedLevel = status.level
+        syncAlertState()
     }
 
     private func syncNotificationState() {
         notificationAuthorizationStatus = notificationManager.authorizationStatusText
-        lastNotificationDate = notificationManager.lastNotificationDate
+        lastNotificationDate = notificationManager.lastNotificationDate ?? alertController.state.lastNotifiedAt
+    }
+
+    private func syncAlertState() {
+        alertState = alertController.state
     }
 }
