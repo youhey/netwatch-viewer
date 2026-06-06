@@ -15,6 +15,7 @@ struct ChartCatalog: Decodable {
     let ping: [ChartCatalogPingTarget]
     let dns: [ChartCatalogDNSTarget]
     let http: [ChartCatalogHTTPTarget]
+    let download: [ChartCatalogDownloadTarget]
     let serviceGroups: [ChartCatalogServiceGroup]
 
     enum CodingKeys: String, CodingKey {
@@ -25,6 +26,7 @@ struct ChartCatalog: Decodable {
         case ping
         case dns
         case http
+        case download
         case serviceGroups
     }
 
@@ -37,6 +39,7 @@ struct ChartCatalog: Decodable {
         ping = try container.decodeIfPresent([ChartCatalogPingTarget].self, forKey: .ping) ?? []
         dns = try container.decodeIfPresent([ChartCatalogDNSTarget].self, forKey: .dns) ?? []
         http = try container.decodeIfPresent([ChartCatalogHTTPTarget].self, forKey: .http) ?? []
+        download = try container.decodeIfPresent([ChartCatalogDownloadTarget].self, forKey: .download) ?? []
         serviceGroups = try container.decodeIfPresent([ChartCatalogServiceGroup].self, forKey: .serviceGroups) ?? []
     }
 }
@@ -89,6 +92,15 @@ struct ChartCatalogHTTPTarget: Decodable, Identifiable {
     let group: String?
     let category: String?
     let url: String?
+    let label: String?
+}
+
+struct ChartCatalogDownloadTarget: Decodable, Identifiable {
+    var id: String { name }
+
+    let name: String
+    let url: String?
+    let expectedBytes: Int?
     let label: String?
 }
 

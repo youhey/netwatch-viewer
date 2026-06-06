@@ -11,11 +11,13 @@ struct LatestResponse: Codable {
     let ping: [PingSample]
     let dns: [DNSSample]
     let http: [HTTPSample]
+    let download: [DownloadSample]
 
-    init(ping: [PingSample] = [], dns: [DNSSample] = [], http: [HTTPSample] = []) {
+    init(ping: [PingSample] = [], dns: [DNSSample] = [], http: [HTTPSample] = [], download: [DownloadSample] = []) {
         self.ping = ping
         self.dns = dns
         self.http = http
+        self.download = download
     }
 
     init(from decoder: Decoder) throws {
@@ -23,6 +25,7 @@ struct LatestResponse: Codable {
         ping = try container.decodeIfPresent([PingSample].self, forKey: .ping) ?? []
         dns = try container.decodeIfPresent([DNSSample].self, forKey: .dns) ?? []
         http = try container.decodeIfPresent([HTTPSample].self, forKey: .http) ?? []
+        download = try container.decodeIfPresent([DownloadSample].self, forKey: .download) ?? []
     }
 }
 

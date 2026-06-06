@@ -18,6 +18,9 @@ struct ChartsView: View {
                 PingLatencyChartView(series: viewModel.pingSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
                 PacketLossChartView(series: viewModel.pingSeries, catalog: viewModel.catalog)
                 HTTPDurationChartView(series: viewModel.httpSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
+                if viewModel.showsDownloadChart {
+                    DownloadThroughputChartView(series: viewModel.downloadSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
+                }
                 ServiceGroupChartView(series: viewModel.serviceSeries, catalog: viewModel.catalog)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)

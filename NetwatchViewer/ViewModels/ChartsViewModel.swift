@@ -19,6 +19,7 @@ final class ChartsViewModel: ObservableObject {
     @Published private(set) var metadata: ChartsMetadata?
     @Published private(set) var pingSeries: [PingChartSeries] = []
     @Published private(set) var httpSeries: [HTTPChartSeries] = []
+    @Published private(set) var downloadSeries: [DownloadChartSeries] = []
     @Published private(set) var serviceSeries: [ServiceChartSeries] = []
     @Published private(set) var isLoadingSupport = false
     @Published private(set) var isLoading = false
@@ -56,6 +57,14 @@ final class ChartsViewModel: ObservableObject {
     var supportedBuckets: [ChartBucket] {
         let values = catalog?.supported?.buckets ?? capabilities?.chart?.buckets
         return chartBuckets(from: values, fallback: ChartBucket.allCases)
+    }
+
+    var showsDownloadChart: Bool {
+        if capabilities?.features.chartsDownload == false {
+            return false
+        }
+
+        return !downloadSeries.isEmpty || !(catalog?.download.isEmpty ?? true)
     }
 
     func startAutoRefresh() {
@@ -198,6 +207,7 @@ final class ChartsViewModel: ObservableObject {
     private func apply(overview: ChartsOverviewResponse) {
         pingSeries = overview.ping
         httpSeries = overview.http
+        downloadSeries = overview.download
         serviceSeries = overview.serviceGroups
         metadata = ChartsMetadata(overview: overview)
         lastUpdated = Date()
@@ -206,6 +216,7 @@ final class ChartsViewModel: ObservableObject {
     private func refreshIndividualSeries(maxPoints: Int) async -> [String] {
         var nextPingSeries: [PingChartSeries] = []
         var nextHTTPSeries: [HTTPChartSeries] = []
+        var nextDownloadSeries: [DownloadChartSeries] = []
         var nextServiceSeries: [ServiceChartSeries] = []
         var errors: [String] = []
 
@@ -236,19 +247,31 @@ final class ChartsViewModel: ObservableObject {
             }
         }
 
-        if !nextPingSeries.isEmpty || !nextHTTPSeries.isEmpty || !nextServiceSeries.isEmpty {
+        if capabilities?.features.chartsDownload ?? true {
+            for name in downloadNamesForFallback {
+                do {
+                    let series = try await client.fetchDownloadSeries(name: name, range: range, bucket: bucket, maxPoints: maxPoints)
+                    nextDownloadSeries.append(series)
+                } catch {
+                    errors.append("Download \(name): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        if !nextPingSeries.isEmpty || !nextHTTPSeries.isEmpty || !nextDownloadSeries.isEmpty || !nextServiceSeries.isEmpty {
             pingSeries = nextPingSeries
             httpSeries = nextHTTPSeries
+            downloadSeries = nextDownloadSeries
             serviceSeries = nextServiceSeries
             metadata = ChartsMetadata(
-                generatedAt: [nextPingSeries.first?.generatedAt, nextHTTPSeries.first?.generatedAt, nextServiceSeries.first?.generatedAt].compactMap { $0 }.first,
-                actualRangeStart: [nextPingSeries.first?.actualRangeStart, nextHTTPSeries.first?.actualRangeStart, nextServiceSeries.first?.actualRangeStart].compactMap { $0 }.first,
-                actualRangeEnd: [nextPingSeries.first?.actualRangeEnd, nextHTTPSeries.first?.actualRangeEnd, nextServiceSeries.first?.actualRangeEnd].compactMap { $0 }.first,
-                timezone: nextPingSeries.first?.timezone ?? nextHTTPSeries.first?.timezone ?? nextServiceSeries.first?.timezone ?? catalog?.timezone,
-                range: nextPingSeries.first?.range ?? nextHTTPSeries.first?.range ?? nextServiceSeries.first?.range ?? range.rawValue,
-                bucket: nextPingSeries.first?.bucket ?? nextHTTPSeries.first?.bucket ?? nextServiceSeries.first?.bucket ?? bucket.rawValue,
-                bucketSeconds: nextPingSeries.first?.bucketSeconds ?? nextHTTPSeries.first?.bucketSeconds ?? nextServiceSeries.first?.bucketSeconds,
-                maxPoints: nextPingSeries.first?.maxPoints ?? nextHTTPSeries.first?.maxPoints ?? nextServiceSeries.first?.maxPoints ?? maxPoints
+                generatedAt: [nextPingSeries.first?.generatedAt, nextHTTPSeries.first?.generatedAt, nextDownloadSeries.first?.generatedAt, nextServiceSeries.first?.generatedAt].compactMap { $0 }.first,
+                actualRangeStart: [nextPingSeries.first?.actualRangeStart, nextHTTPSeries.first?.actualRangeStart, nextDownloadSeries.first?.actualRangeStart, nextServiceSeries.first?.actualRangeStart].compactMap { $0 }.first,
+                actualRangeEnd: [nextPingSeries.first?.actualRangeEnd, nextHTTPSeries.first?.actualRangeEnd, nextDownloadSeries.first?.actualRangeEnd, nextServiceSeries.first?.actualRangeEnd].compactMap { $0 }.first,
+                timezone: nextPingSeries.first?.timezone ?? nextHTTPSeries.first?.timezone ?? nextDownloadSeries.first?.timezone ?? nextServiceSeries.first?.timezone ?? catalog?.timezone,
+                range: nextPingSeries.first?.range ?? nextHTTPSeries.first?.range ?? nextDownloadSeries.first?.range ?? nextServiceSeries.first?.range ?? range.rawValue,
+                bucket: nextPingSeries.first?.bucket ?? nextHTTPSeries.first?.bucket ?? nextDownloadSeries.first?.bucket ?? nextServiceSeries.first?.bucket ?? bucket.rawValue,
+                bucketSeconds: nextPingSeries.first?.bucketSeconds ?? nextHTTPSeries.first?.bucketSeconds ?? nextDownloadSeries.first?.bucketSeconds ?? nextServiceSeries.first?.bucketSeconds,
+                maxPoints: nextPingSeries.first?.maxPoints ?? nextHTTPSeries.first?.maxPoints ?? nextDownloadSeries.first?.maxPoints ?? nextServiceSeries.first?.maxPoints ?? maxPoints
             )
             lastUpdated = Date()
         }
@@ -283,6 +306,10 @@ final class ChartsViewModel: ObservableObject {
     private var serviceGroupsForFallback: [String] {
         let groups = catalog?.serviceGroups.map(\.group) ?? []
         return groups.isEmpty ? legacyFallbackServiceGroups : groups
+    }
+
+    private var downloadNamesForFallback: [String] {
+        catalog?.download.map(\.name) ?? []
     }
 
     private func clampedMaxPoints(_ value: Int) -> Int {

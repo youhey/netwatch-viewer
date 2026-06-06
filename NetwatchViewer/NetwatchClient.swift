@@ -46,6 +46,10 @@ struct NetwatchClient {
         try await fetch(path: "/api/monitoring/thresholds")
     }
 
+    func fetchDownloadLatest() async throws -> DownloadLatestResponse {
+        try await fetch(path: "/api/download/latest")
+    }
+
     func fetchPingSeries(name: String, range: ChartRange, bucket: ChartBucket, maxPoints: Int = 500) async throws -> PingChartSeries {
         try await fetch(
             path: "/api/ping/series",
@@ -75,6 +79,18 @@ struct NetwatchClient {
             path: "/api/services/series",
             queryItems: [
                 URLQueryItem(name: "group", value: group),
+                URLQueryItem(name: "range", value: range.rawValue),
+                URLQueryItem(name: "bucket", value: bucket.rawValue),
+                URLQueryItem(name: "max_points", value: String(maxPoints))
+            ]
+        )
+    }
+
+    func fetchDownloadSeries(name: String, range: ChartRange, bucket: ChartBucket, maxPoints: Int = 500) async throws -> DownloadChartSeries {
+        try await fetch(
+            path: "/api/download/series",
+            queryItems: [
+                URLQueryItem(name: "name", value: name),
                 URLQueryItem(name: "range", value: range.rawValue),
                 URLQueryItem(name: "bucket", value: bucket.rawValue),
                 URLQueryItem(name: "max_points", value: String(maxPoints))

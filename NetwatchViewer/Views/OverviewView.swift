@@ -16,6 +16,7 @@ struct OverviewView: View {
                 PingSectionView(samples: latest.ping)
                 DNSSectionView(samples: latest.dns)
                 HTTPSectionView(samples: latest.http)
+                DownloadSectionView(samples: latest.download)
             } else {
                 Text("No latest data loaded.")
                     .foregroundStyle(.secondary)

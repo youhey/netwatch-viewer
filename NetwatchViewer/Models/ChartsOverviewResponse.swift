@@ -18,6 +18,7 @@ struct ChartsOverviewResponse: Decodable {
     let maxPoints: Int?
     let ping: [PingChartSeries]
     let http: [HTTPChartSeries]
+    let download: [DownloadChartSeries]
     let serviceGroups: [ServiceChartSeries]
 
     enum CodingKeys: String, CodingKey {
@@ -31,6 +32,7 @@ struct ChartsOverviewResponse: Decodable {
         case maxPoints
         case ping
         case http
+        case download
         case serviceGroups
     }
 
@@ -46,6 +48,7 @@ struct ChartsOverviewResponse: Decodable {
         maxPoints = try container.decodeIfPresent(Int.self, forKey: .maxPoints)
         ping = try container.decodeIfPresent([PingChartSeries].self, forKey: .ping) ?? []
         http = try container.decodeIfPresent([HTTPChartSeries].self, forKey: .http) ?? []
+        download = try container.decodeIfPresent([DownloadChartSeries].self, forKey: .download) ?? []
         serviceGroups = try container.decodeIfPresent([ServiceChartSeries].self, forKey: .serviceGroups) ?? []
     }
 }
