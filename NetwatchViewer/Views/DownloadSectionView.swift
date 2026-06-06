@@ -9,6 +9,7 @@ import SwiftUI
 
 struct DownloadSectionView: View {
     let samples: [DownloadSample]
+    let evaluator: SeverityEvaluator
 
     private var sortedSamples: [DownloadSample] {
         samples.sorted { lhs, rhs in
@@ -24,7 +25,7 @@ struct DownloadSectionView: View {
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                     ForEach(sortedSamples, id: \DownloadSample.name) { sample in
-                        DownloadRowView(sample: sample)
+                        DownloadRowView(sample: sample, severity: evaluator.severityForDownload(sample))
                     }
                 }
                 .font(.system(.body, design: .monospaced))
@@ -35,15 +36,17 @@ struct DownloadSectionView: View {
 
 private struct DownloadRowView: View {
     let sample: DownloadSample
+    let severity: MonitoringLevel
 
     var body: some View {
         GridRow {
-            StatusDot(ok: sample.ok)
+            SeverityChip(level: severity)
             Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
             Text(formatMbps(sample.mbps))
-                .foregroundStyle(sample.ok ? Color.primary : Color.red)
+                .foregroundStyle(valueColor)
             Text(formatMilliseconds(sample.durationMs))
+                .foregroundStyle(valueColor)
             Text("\(formatBytes(sample.downloadedBytes)) / \(formatBytes(sample.expectedBytes))")
                 .foregroundStyle(.secondary)
             Text(sample.ts.formatted(date: .omitted, time: .standard))
@@ -58,5 +61,9 @@ private struct DownloadRowView: View {
                     .gridCellColumns(5)
             }
         }
+    }
+
+    private var valueColor: Color {
+        severity == .ok ? .primary : severity.dashboardAccentColor
     }
 }

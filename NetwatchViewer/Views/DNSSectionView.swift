@@ -9,6 +9,7 @@ import SwiftUI
 
 struct DNSSectionView: View {
     let samples: [DNSSample]
+    let evaluator: SeverityEvaluator
 
     private var sortedSamples: [DNSSample] {
         samples.sorted { lhs, rhs in
@@ -24,7 +25,7 @@ struct DNSSectionView: View {
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                     ForEach(sortedSamples, id: \DNSSample.name) { sample in
-                        DNSRowView(sample: sample)
+                        DNSRowView(sample: sample, severity: evaluator.severityForDNS(sample))
                     }
                 }
             }
@@ -34,10 +35,11 @@ struct DNSSectionView: View {
 
 private struct DNSRowView: View {
     let sample: DNSSample
+    let severity: MonitoringLevel
 
     var body: some View {
         GridRow {
-            StatusDot(ok: sample.ok)
+            SeverityChip(level: severity)
             VStack(alignment: .leading, spacing: 2) {
                 Text(sample.displayName ?? sample.name)
                     .fontWeight(.medium)
@@ -45,6 +47,11 @@ private struct DNSRowView: View {
                     .foregroundStyle(.secondary)
             }
             Text(formatMilliseconds(sample.durationMs))
+                .foregroundStyle(valueColor)
         }
+    }
+
+    private var valueColor: Color {
+        severity == .ok ? .primary : severity.dashboardAccentColor
     }
 }

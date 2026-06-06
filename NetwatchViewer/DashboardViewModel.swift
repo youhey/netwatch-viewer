@@ -12,6 +12,7 @@ import Foundation
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var monitoringStatus: MonitoringStatus?
     @Published private(set) var latest: LatestResponse?
+    @Published private(set) var thresholds: MonitoringThresholds?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastUpdated: Date?
@@ -102,6 +103,12 @@ final class DashboardViewModel: ObservableObject {
             didUpdate = true
         } catch {
             errors.append("Latest: \(error.localizedDescription)")
+        }
+
+        do {
+            thresholds = try await client.fetchMonitoringThresholds()
+        } catch {
+            thresholds = nil
         }
 
         if didUpdate {

@@ -60,7 +60,7 @@ struct MetricCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(value)
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(valueColor)
                     .monospacedDigit()
                     .lineLimit(1)
 
@@ -82,12 +82,36 @@ struct MetricCard: View {
         .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.08, green: 0.10, blue: 0.13))
+                .fill(backgroundColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(severity.dashboardAccentColor.opacity(0.28), lineWidth: 1)
+                .stroke(severity.dashboardAccentColor.opacity(borderOpacity), lineWidth: 1)
         )
+    }
+
+    private var valueColor: Color {
+        severity == .ok ? .primary : severity.dashboardAccentColor
+    }
+
+    private var backgroundColor: Color {
+        switch severity {
+        case .warning, .critical:
+            return Color(red: 0.08, green: 0.10, blue: 0.13).mix(with: severity.dashboardAccentColor, by: 0.08)
+        case .ok, .unknown:
+            return Color(red: 0.08, green: 0.10, blue: 0.13)
+        }
+    }
+
+    private var borderOpacity: Double {
+        switch severity {
+        case .warning, .critical:
+            return 0.55
+        case .ok:
+            return 0.22
+        case .unknown:
+            return 0.28
+        }
     }
 }
 

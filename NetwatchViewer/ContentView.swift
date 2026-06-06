@@ -37,6 +37,7 @@ struct ContentView: View {
                 OverviewView(
                     status: viewModel.monitoringStatus,
                     latest: viewModel.latest,
+                    thresholds: viewModel.thresholds,
                     lastUpdated: viewModel.lastUpdated,
                     alertState: viewModel.alertState
                 )

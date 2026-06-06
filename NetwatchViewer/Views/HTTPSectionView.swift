@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HTTPSectionView: View {
     let samples: [HTTPSample]
+    let evaluator: SeverityEvaluator
 
     private var sortedSamples: [HTTPSample] {
         samples.sorted { lhs, rhs in
@@ -24,7 +25,7 @@ struct HTTPSectionView: View {
             } else {
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
                     ForEach(sortedSamples, id: \HTTPSample.name) { sample in
-                        HTTPRowView(sample: sample)
+                        HTTPRowView(sample: sample, severity: evaluator.severityForHTTP(sample))
                     }
                 }
                 .font(.system(.body, design: .monospaced))
@@ -35,10 +36,11 @@ struct HTTPSectionView: View {
 
 private struct HTTPRowView: View {
     let sample: HTTPSample
+    let severity: MonitoringLevel
 
     var body: some View {
         GridRow {
-            StatusDot(ok: sample.ok)
+            SeverityChip(level: severity)
             Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
             Text(sample.group ?? "-")
@@ -48,8 +50,13 @@ private struct HTTPRowView: View {
             Text(formatHTTPStatus(sample.httpStatus))
                 .foregroundStyle(sample.ok ? Color.secondary : Color.red)
             Text(formatMilliseconds(sample.totalMs))
+                .foregroundStyle(valueColor)
             Text("ttfb \(formatMilliseconds(sample.ttfbMs))")
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var valueColor: Color {
+        severity == .ok ? .primary : severity.dashboardAccentColor
     }
 }

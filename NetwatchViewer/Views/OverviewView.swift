@@ -10,6 +10,7 @@ import SwiftUI
 struct OverviewView: View {
     let status: MonitoringStatus?
     let latest: LatestResponse?
+    let thresholds: MonitoringThresholds?
     let lastUpdated: Date?
     let alertState: AlertState
 
@@ -33,17 +34,23 @@ struct OverviewView: View {
             alertStateDetails
 
             if let latest {
-                PingSectionView(samples: latest.ping)
-                DNSSectionView(samples: latest.dns)
-                HTTPSectionView(samples: latest.http)
-                DownloadSectionView(samples: latest.download)
+                PingSectionView(samples: latest.ping, evaluator: evaluator)
+                DNSSectionView(samples: latest.dns, evaluator: evaluator)
+                HTTPSectionView(samples: latest.http, evaluator: evaluator)
+                DownloadSectionView(samples: latest.download, evaluator: evaluator)
             } else {
                 SectionCard(title: "Latest Data") {
                     Text("No latest data loaded.")
                         .foregroundStyle(.secondary)
                 }
             }
+
+            thresholdsSummary
         }
+    }
+
+    private var evaluator: SeverityEvaluator {
+        SeverityEvaluator(thresholds: thresholds)
     }
 
     private var metricColumns: [GridItem] {
@@ -102,6 +109,31 @@ struct OverviewView: View {
         }
     }
 
+    private var thresholdsSummary: some View {
+        SectionCard(title: "Thresholds", subtitle: "Warning and critical bands") {
+            if let thresholds {
+                VStack(alignment: .leading, spacing: 6) {
+                    thresholdText("Gateway RTT", band: thresholds.ping?.gatewayRttAvgMs, unit: "ms", mode: .high)
+                    thresholdText("Gateway Loss", band: thresholds.ping?.gatewayLossPercent, unit: "%", mode: .high)
+                    thresholdText("External RTT", band: thresholds.ping?.externalRttAvgMs, unit: "ms", mode: .high)
+                    thresholdText("Packet Loss", band: thresholds.ping?.externalLossPercent, unit: "%", mode: .high)
+                    thresholdText("DNS Duration", band: thresholds.dns?.durationMs, unit: "ms", mode: .high)
+                    thresholdText("HTTP Total", band: thresholds.http?.totalMs, unit: "ms", mode: .high)
+
+                    ForEach(downloadThresholdRows(thresholds), id: \.label) { row in
+                        thresholdText(row.label, band: row.band, unit: "Mbps", mode: .low)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Text("Thresholds unavailable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var metrics: [DashboardMetric] {
         guard let latest else {
             return [
@@ -133,8 +165,8 @@ struct OverviewView: View {
             title: "Gateway",
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
-            subtitle: sample.ok ? "OK" : "Probe failed",
-            severity: probeSeverity(ok: sample.ok)
+            subtitle: sample.ok ? "Gateway RTT" : "Probe failed",
+            severity: evaluator.severityForGatewayPing(sample)
         )
     }
 
@@ -150,7 +182,7 @@ struct OverviewView: View {
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
             subtitle: sample.displayName ?? sample.name,
-            severity: probeSeverity(ok: sample.ok)
+            severity: evaluator.severityForExternalPing(sample)
         )
     }
 
@@ -162,21 +194,12 @@ struct OverviewView: View {
             return DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping probes", severity: .unknown)
         }
 
-        let severity: MonitoringLevel
-        if samples.contains(where: { !$0.ok }) {
-            severity = .critical
-        } else if let maxLoss, maxLoss > 0 {
-            severity = .warning
-        } else {
-            severity = .ok
-        }
-
         return DashboardMetric(
             title: "Packet Loss",
             value: formatMetricValue(maxLoss),
             unit: "%",
             subtitle: "Max across ping probes",
-            severity: severity
+            severity: evaluator.severityForPacketLossSummary(samples)
         )
     }
 
@@ -188,14 +211,12 @@ struct OverviewView: View {
             return DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service probes", severity: .unknown)
         }
 
-        let severity: MonitoringLevel = okCount == total ? .ok : .warning
-
         return DashboardMetric(
             title: "Services",
             value: "\(okCount)/\(total)",
             unit: "OK",
             subtitle: "HTTP probes healthy",
-            severity: severity
+            severity: evaluator.severityForServiceSummary(latest.http)
         )
     }
 
@@ -211,7 +232,7 @@ struct OverviewView: View {
             value: formatMetricValue(sample.mbps),
             unit: "Mbps",
             subtitle: sample.displayName ?? sample.name,
-            severity: probeSeverity(ok: sample.ok)
+            severity: evaluator.severityForDownload(sample)
         )
     }
 
@@ -241,10 +262,6 @@ struct OverviewView: View {
         return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
-    private func probeSeverity(ok: Bool) -> MonitoringLevel {
-        ok ? .ok : .critical
-    }
-
     private func formatOptionalDate(_ date: Date?) -> String {
         guard let date else {
             return "-"
@@ -262,6 +279,50 @@ struct OverviewView: View {
                 .truncationMode(.middle)
         }
     }
+
+    private func thresholdText(_ label: String, band: ThresholdBand?, unit: String, mode: ThresholdMode) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .frame(width: 104, alignment: .leading)
+            Text(formatThresholdBand(band, unit: unit, mode: mode))
+                .monospacedDigit()
+        }
+    }
+
+    private func formatThresholdBand(_ band: ThresholdBand?, unit: String, mode: ThresholdMode) -> String {
+        guard let band else {
+            return "-"
+        }
+
+        let direction = mode == .high ? ">=" : "<"
+        return "warn \(direction) \(formatThresholdValue(band.warning, unit: unit)) / crit \(direction) \(formatThresholdValue(band.critical, unit: unit))"
+    }
+
+    private func formatThresholdValue(_ value: Double?, unit: String) -> String {
+        guard let value else {
+            return "-"
+        }
+
+        return "\(value.formatted(.number.precision(.fractionLength(0...1))))\(unit)"
+    }
+
+    private func downloadThresholdRows(_ thresholds: MonitoringThresholds) -> [DownloadThresholdRow] {
+        thresholds.download?.values
+            .map { key, band in
+                DownloadThresholdRow(label: key.replacingOccurrences(of: "_mbps", with: ""), band: band)
+            }
+            .sorted { $0.label < $1.label } ?? []
+    }
+}
+
+private enum ThresholdMode {
+    case high
+    case low
+}
+
+private struct DownloadThresholdRow {
+    let label: String
+    let band: ThresholdBand
 }
 
 private struct DashboardMetric: Identifiable {
