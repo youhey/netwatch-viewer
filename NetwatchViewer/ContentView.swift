@@ -8,63 +8,77 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var monitoringStatus: MonitoringStatus?
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    private let client = NetwatchClient()
+    @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Netwatch")
-                .font(.title)
-                .bold()
+            HStack {
+                Text("Netwatch")
+                    .font(.title)
+                    .bold()
 
-            if isLoading {
-                ProgressView("Loading...")
-            } else if let errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-            } else if let monitoringStatus {
+                Spacer()
+
+                Button {
+                    Task {
+                        await viewModel.refresh()
+                    }
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+                .disabled(viewModel.isLoading)
+            }
+
+            if let monitoringStatus = viewModel.monitoringStatus {
                 VStack(alignment: .leading, spacing: 8) {
-                    statusRow(label: "Status", value: monitoringStatus.status)
                     statusRow(label: "Level", value: monitoringStatus.level)
                     statusRow(label: "Title", value: monitoringStatus.title)
                     statusRow(label: "Message", value: monitoringStatus.message)
+                    statusRow(label: "Alert", value: monitoringStatus.alert ? "true" : "false")
                 }
             } else {
                 Text("No status loaded.")
                     .foregroundStyle(.secondary)
             }
+
+            statusRow(label: "Updated", value: lastUpdatedText)
+
+            if viewModel.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading...")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+            }
         }
-        .frame(minWidth: 360, minHeight: 220, alignment: .topLeading)
+        .frame(minWidth: 420, minHeight: 260, alignment: .topLeading)
         .padding()
         .task {
-            await loadMonitoringStatus()
+            await viewModel.runAutoRefresh()
         }
+    }
+
+    private var lastUpdatedText: String {
+        guard let lastUpdated = viewModel.lastUpdated else {
+            return "Never"
+        }
+
+        return lastUpdated.formatted(date: .omitted, time: .standard)
     }
 
     private func statusRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .leading)
+                .frame(width: 80, alignment: .leading)
             Text(value)
         }
-    }
-
-    private func loadMonitoringStatus() async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            monitoringStatus = try await client.fetchMonitoringStatus()
-        } catch {
-            monitoringStatus = nil
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
     }
 }
 
