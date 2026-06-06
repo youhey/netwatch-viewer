@@ -9,8 +9,27 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
+    @StateObject private var chartsViewModel = ChartsViewModel()
 
     var body: some View {
+        TabView {
+            overviewTab
+                .tabItem {
+                    Label("Overview", systemImage: "list.bullet.rectangle")
+                }
+
+            ChartsView(viewModel: chartsViewModel)
+                .tabItem {
+                    Label("Charts", systemImage: "chart.xyaxis.line")
+                }
+        }
+        .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
+        .task {
+            viewModel.startAutoRefresh()
+        }
+    }
+
+    private var overviewTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
@@ -21,10 +40,6 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding()
-        }
-        .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
-        .task {
-            viewModel.startAutoRefresh()
         }
     }
 
