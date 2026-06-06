@@ -10,8 +10,17 @@ import SwiftUI
 
 struct PacketLossChartView: View {
     let series: [PingChartSeries]
+    let thresholds: MonitoringThresholds?
     let catalog: ChartCatalog?
     @Binding var selectedNames: Set<String>
+
+    private var warningThreshold: Double? {
+        thresholds?.ping?.externalLossPercent?.warning
+    }
+
+    private var criticalThreshold: Double? {
+        thresholds?.ping?.externalLossPercent?.critical
+    }
 
     private var points: [ChartValuePoint] {
         chartPoints(from: visibleSeries)
@@ -26,12 +35,26 @@ struct PacketLossChartView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ChartSeriesSelector(items: selectableItems, selectedIDs: $selectedNames)
 
-                Chart(points) { point in
-                    LineMark(
-                        x: .value("Time", point.ts),
-                        y: .value("Loss", point.value)
-                    )
-                    .foregroundStyle(by: .value("Probe", point.series))
+                Chart {
+                    ForEach(points) { point in
+                        LineMark(
+                            x: .value("Time", point.ts),
+                            y: .value("Loss", point.value)
+                        )
+                        .foregroundStyle(by: .value("Probe", point.series))
+                    }
+
+                    if let warningThreshold {
+                        RuleMark(y: .value("Warning", warningThreshold))
+                            .foregroundStyle(.orange)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    }
+
+                    if let criticalThreshold {
+                        RuleMark(y: .value("Critical", criticalThreshold))
+                            .foregroundStyle(.red)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    }
                 }
                 .chartYAxisLabel("%")
                 .chartLegend(.hidden)

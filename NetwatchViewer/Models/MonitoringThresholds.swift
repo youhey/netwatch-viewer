@@ -41,6 +41,7 @@ struct ThresholdBand: Decodable {
 }
 
 struct PingMonitoringThresholds: Decodable {
+    let gatewayRttAvgMs: ThresholdBand?
     let externalRttAvgMs: ThresholdBand?
     let externalLossPercent: ThresholdBand?
     let gatewayLossPercent: ThresholdBand?

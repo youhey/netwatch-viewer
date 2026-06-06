@@ -54,10 +54,14 @@ final class NotificationManager: ObservableObject {
     func notify(status: MonitoringStatus) async throws {
         let content = UNMutableNotificationContent()
         content.title = notificationTitle(for: status)
-        content.body = status.message
+        if let primaryReason = status.primaryReason {
+            content.body = "\(status.message)\n\(primaryReason.summaryText)"
+        } else {
+            content.body = status.message
+        }
         content.sound = .default
 
-        let identifier = "netwatch.\(normalizedLevel(status.level))"
+        let identifier = "netwatch.\(status.statusId ?? normalizedLevel(status.level))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
 
         try await center.add(request)
@@ -66,19 +70,19 @@ final class NotificationManager: ObservableObject {
     }
 
     private func notificationTitle(for status: MonitoringStatus) -> String {
-        switch normalizedLevel(status.level) {
-        case "critical":
+        switch status.level {
+        case .critical:
             return status.title.uppercased().contains("CRITICAL") ? status.title : "NET CRITICAL"
         default:
             return status.title
         }
     }
 
-    private func normalizedLevel(_ level: String) -> String {
-        switch level.lowercased() {
-        case "warning", "critical":
-            return level.lowercased()
-        default:
+    private func normalizedLevel(_ level: MonitoringLevel) -> String {
+        switch level {
+        case .warning, .critical:
+            return level.rawValue
+        case .ok, .unknown:
             return "unknown"
         }
     }

@@ -23,6 +23,9 @@ final class DashboardViewModel: ObservableObject {
     private let notificationManager: NotificationManager
     private let refreshInterval: Duration
     private var refreshTask: Task<Void, Never>?
+    private var lastNotifiedStatusId: String?
+    private var lastObservedStatusId: String?
+    private var lastObservedLevel: MonitoringLevel?
 
     init(
         client: NetwatchClient? = nil,
@@ -80,11 +83,12 @@ final class DashboardViewModel: ObservableObject {
         var didUpdate = false
 
         do {
-            let previousLevel = monitoringStatus?.level
+            let previousLevel = lastObservedLevel ?? monitoringStatus?.level
             let status = try await client.fetchMonitoringStatus()
             monitoringStatus = status
             didUpdate = true
             await notifyIfNeeded(previousLevel: previousLevel, status: status)
+            updateObservedStatus(status)
         } catch {
             errors.append("Status: \(error.localizedDescription)")
         }
@@ -122,8 +126,12 @@ final class DashboardViewModel: ObservableObject {
         syncNotificationState()
     }
 
-    private func notifyIfNeeded(previousLevel: String?, status: MonitoringStatus) async {
-        guard shouldNotify(previousLevel: previousLevel, newLevel: status.level, alert: status.alert) else {
+    private func notifyIfNeeded(previousLevel: MonitoringLevel?, status: MonitoringStatus) async {
+        if status.level == .ok {
+            lastNotifiedStatusId = nil
+        }
+
+        guard shouldNotify(previousLevel: previousLevel, status: status) else {
             return
         }
 
@@ -134,24 +142,39 @@ final class DashboardViewModel: ObservableObject {
             notificationErrorMessage = "Notifications: \(error.localizedDescription)"
         }
 
+        if let statusId = status.statusId {
+            lastNotifiedStatusId = statusId
+        }
+
         syncNotificationState()
     }
 
-    private func shouldNotify(previousLevel: String?, newLevel: String, alert: Bool) -> Bool {
-        guard alert else {
+    private func shouldNotify(previousLevel: MonitoringLevel?, status: MonitoringStatus) -> Bool {
+        guard status.alert else {
             return false
         }
 
-        let previousLevel = previousLevel?.lowercased()
-
-        switch newLevel.lowercased() {
-        case "critical":
-            return previousLevel != "critical"
-        case "warning":
-            return previousLevel != "warning" && previousLevel != "critical"
-        default:
+        guard status.level == .warning || status.level == .critical else {
             return false
         }
+
+        if let statusId = status.statusId {
+            return statusId != lastNotifiedStatusId
+        }
+
+        switch status.level {
+        case .critical:
+            return previousLevel != .critical
+        case .warning:
+            return previousLevel != .warning && previousLevel != .critical
+        case .ok, .unknown:
+            return false
+        }
+    }
+
+    private func updateObservedStatus(_ status: MonitoringStatus) {
+        lastObservedStatusId = status.statusId
+        lastObservedLevel = status.level
     }
 
     private func syncNotificationState() {

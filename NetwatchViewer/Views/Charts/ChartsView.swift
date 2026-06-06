@@ -20,7 +20,7 @@ struct ChartsView: View {
                 header
 
                 PingLatencyChartView(series: viewModel.pingSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedPingNames)
-                PacketLossChartView(series: viewModel.pingSeries, catalog: viewModel.catalog, selectedNames: $selectedPingNames)
+                PacketLossChartView(series: viewModel.pingSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedPingNames)
                 HTTPDurationChartView(series: viewModel.httpSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedHTTPNames)
                 if viewModel.showsDownloadChart {
                     DownloadThroughputChartView(series: viewModel.downloadSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedDownloadNames)

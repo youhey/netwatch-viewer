@@ -93,18 +93,75 @@ struct ContentView: View {
                         Image(statusImageName(for: monitoringStatus.level))
                             .resizable()
                             .frame(width: 16, height: 16)
-                        Text(monitoringStatus.level.uppercased())
+                        Text(monitoringStatus.level.displayText)
                             .fontWeight(.semibold)
                     }
-                    statusRow(label: "Level", value: monitoringStatus.level)
+                    statusRow(label: "Level", value: monitoringStatus.level.rawValue)
                     statusRow(label: "Title", value: monitoringStatus.title)
                     statusRow(label: "Message", value: monitoringStatus.message)
+                    statusRow(label: "Primary", value: monitoringStatus.primaryReason?.summaryText ?? "-")
+                    statusRow(label: "Issues", value: String(monitoringStatus.issueCount))
                     statusRow(label: "Alert", value: monitoringStatus.alert ? "true" : "false")
+                    if let generatedAt = monitoringStatus.generatedAt {
+                        statusRow(label: "Generated", value: generatedAt.formatted(date: .abbreviated, time: .standard))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let statusId = monitoringStatus.statusId {
+                        statusRow(label: "Status ID", value: statusId)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+
+                monitoringReasons(monitoringStatus)
             } else {
                 Text("No status loaded.")
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func monitoringReasons(_ status: MonitoringStatus) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Reasons")
+                .font(.headline)
+
+            if status.reasons.isEmpty {
+                Text("No active issues")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(sortedReasons(status.reasons)) { reason in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 8) {
+                            Text(reason.level.displayText)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(reasonColor(reason.level))
+                            Text(reason.code)
+                                .fontWeight(reason == status.primaryReason ? .semibold : .regular)
+
+                            if reason == status.primaryReason {
+                                Text("Primary")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Text(reason.detailText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func sortedReasons(_ reasons: [MonitoringReason]) -> [MonitoringReason] {
+        reasons.sorted { lhs, rhs in
+            (lhs.level.sortPriority, lhs.code, lhs.target ?? "", lhs.metric ?? "") < (rhs.level.sortPriority, rhs.code, rhs.target ?? "", rhs.metric ?? "")
         }
     }
 
@@ -125,15 +182,28 @@ struct ContentView: View {
         }
     }
 
-    private func statusImageName(for level: String) -> String {
-        switch level.lowercased() {
-        case "ok":
+    private func reasonColor(_ level: MonitoringLevel) -> Color {
+        switch level {
+        case .ok:
+            return .green
+        case .warning:
+            return .orange
+        case .critical:
+            return .red
+        case .unknown:
+            return .secondary
+        }
+    }
+
+    private func statusImageName(for level: MonitoringLevel) -> String {
+        switch level {
+        case .ok:
             "status-ok"
-        case "warning":
+        case .warning:
             "status-warning"
-        case "critical":
+        case .critical:
             "status-critical"
-        default:
+        case .unknown:
             "status-unknown"
         }
     }

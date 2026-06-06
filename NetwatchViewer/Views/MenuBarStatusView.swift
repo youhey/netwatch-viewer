@@ -57,7 +57,7 @@ struct MenuBarStatusView: View {
                     Image(statusImageName(for: monitoringStatus.level))
                         .resizable()
                         .frame(width: 16, height: 16)
-                    Text("Status: \(monitoringStatus.level.uppercased())")
+                    Text("Status: \(monitoringStatus.level.displayText)")
                         .fontWeight(.semibold)
                 }
 
@@ -68,6 +68,8 @@ struct MenuBarStatusView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                detailRow(label: "Primary", value: monitoringStatus.primaryReason?.summaryText ?? "-")
+                detailRow(label: "Issues", value: String(monitoringStatus.issueCount))
                 detailRow(label: "Alert", value: monitoringStatus.alert ? "true" : "false")
             } else {
                 Text("Status: Unknown")
@@ -126,15 +128,15 @@ struct MenuBarStatusView: View {
         }
     }
 
-    private func statusImageName(for level: String) -> String {
-        switch level.lowercased() {
-        case "ok":
+    private func statusImageName(for level: MonitoringLevel) -> String {
+        switch level {
+        case .ok:
             "status-ok"
-        case "warning":
+        case .warning:
             "status-warning"
-        case "critical":
+        case .critical:
             "status-critical"
-        default:
+        case .unknown:
             "status-unknown"
         }
     }

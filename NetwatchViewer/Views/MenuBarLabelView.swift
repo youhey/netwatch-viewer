@@ -21,24 +21,24 @@ struct MenuBarLabelView: View {
     }
 
     private var menuBarImageName: String {
-        guard let level = viewModel.monitoringStatus?.level.lowercased() else {
+        guard let level = viewModel.monitoringStatus?.level else {
             return "menu-bar-unknown"
         }
 
         switch level {
-        case "ok":
+        case .ok:
             return "menu-bar-ok"
-        case "warning":
+        case .warning:
             return "menu-bar-warning"
-        case "critical":
+        case .critical:
             return "menu-bar-critical"
-        default:
+        case .unknown:
             return "menu-bar-unknown"
         }
     }
 
     private var menuBarAccessibilityLabel: String {
-        guard let level = viewModel.monitoringStatus?.level.uppercased() else {
+        guard let level = viewModel.monitoringStatus?.level.displayText else {
             return "Netwatch status unknown"
         }
 
