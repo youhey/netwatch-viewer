@@ -126,5 +126,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .environmentObject(DashboardViewModel())
+        .environmentObject(DashboardViewModel(requestNotificationsOnInit: false))
 }

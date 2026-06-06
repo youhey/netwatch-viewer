@@ -75,6 +75,8 @@ struct MenuBarStatusView: View {
             }
 
             detailRow(label: "Updated", value: lastUpdatedText)
+            detailRow(label: "Notifications", value: viewModel.notificationAuthorizationStatus)
+            detailRow(label: "Last notify", value: lastNotificationText)
 
             if viewModel.isLoading {
                 HStack(spacing: 8) {
@@ -90,6 +92,12 @@ struct MenuBarStatusView: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let notificationErrorMessage = viewModel.notificationErrorMessage {
+                Text(notificationErrorMessage)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -101,11 +109,19 @@ struct MenuBarStatusView: View {
         return lastUpdated.formatted(date: .omitted, time: .standard)
     }
 
+    private var lastNotificationText: String {
+        guard let lastNotificationDate = viewModel.lastNotificationDate else {
+            return "Never"
+        }
+
+        return lastNotificationDate.formatted(date: .omitted, time: .standard)
+    }
+
     private func detailRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .leading)
+                .frame(width: 92, alignment: .leading)
             Text(value)
         }
     }
