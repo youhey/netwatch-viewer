@@ -29,6 +29,24 @@ struct NetwatchClient {
 
         return try JSONDecoder().decode(MonitoringStatus.self, from: data)
     }
+
+    func fetchLatest() async throws -> LatestResponse {
+        let url = baseURL.appending(path: "/api/latest")
+        let (data, response) = try await urlSession.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetwatchClientError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw NetwatchClientError.httpStatus(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        return try decoder.decode(LatestResponse.self, from: data)
+    }
 }
 
 enum NetwatchClientError: LocalizedError {

@@ -11,6 +11,7 @@ import Foundation
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var monitoringStatus: MonitoringStatus?
+    @Published private(set) var latest: LatestResponse?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastUpdated: Date?
@@ -47,12 +48,33 @@ final class DashboardViewModel: ObservableObject {
 
         isLoading = true
 
+        var errors: [String] = []
+        var didUpdate = false
+
         do {
-            monitoringStatus = try await client.fetchMonitoringStatus()
-            lastUpdated = Date()
-            errorMessage = nil
+            let status = try await client.fetchMonitoringStatus()
+            monitoringStatus = status
+            didUpdate = true
         } catch {
-            errorMessage = error.localizedDescription
+            errors.append("Status: \(error.localizedDescription)")
+        }
+
+        do {
+            let latestResponse = try await client.fetchLatest()
+            latest = latestResponse
+            didUpdate = true
+        } catch {
+            errors.append("Latest: \(error.localizedDescription)")
+        }
+
+        if didUpdate {
+            lastUpdated = Date()
+        }
+
+        if errors.isEmpty {
+            errorMessage = nil
+        } else {
+            errorMessage = errors.joined(separator: "\n")
         }
 
         isLoading = false

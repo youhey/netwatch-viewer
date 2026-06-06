@@ -11,7 +11,25 @@ struct ContentView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+
+                statusSummary
+
+                OverviewView(latest: viewModel.latest)
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding()
+        }
+        .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
+        .task {
+            await viewModel.runAutoRefresh()
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Netwatch")
                     .font(.title)
@@ -29,8 +47,40 @@ struct ContentView: View {
                 .disabled(viewModel.isLoading)
             }
 
+            HStack(spacing: 12) {
+                statusRow(label: "Updated", value: lastUpdatedText)
+
+                if viewModel.isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading...")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var statusSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if let monitoringStatus = viewModel.monitoringStatus {
                 VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Status")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 80, alignment: .leading)
+                        Circle()
+                            .fill(statusColor(for: monitoringStatus.level))
+                            .frame(width: 8, height: 8)
+                        Text(monitoringStatus.level.uppercased())
+                            .fontWeight(.semibold)
+                    }
                     statusRow(label: "Level", value: monitoringStatus.level)
                     statusRow(label: "Title", value: monitoringStatus.title)
                     statusRow(label: "Message", value: monitoringStatus.message)
@@ -40,27 +90,6 @@ struct ContentView: View {
                 Text("No status loaded.")
                     .foregroundStyle(.secondary)
             }
-
-            statusRow(label: "Updated", value: lastUpdatedText)
-
-            if viewModel.isLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading...")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-            }
-        }
-        .frame(minWidth: 420, minHeight: 260, alignment: .topLeading)
-        .padding()
-        .task {
-            await viewModel.runAutoRefresh()
         }
     }
 
@@ -78,6 +107,17 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .leading)
             Text(value)
+        }
+    }
+
+    private func statusColor(for level: String) -> Color {
+        switch level.lowercased() {
+        case "ok":
+            .green
+        case "warning":
+            .orange
+        default:
+            .red
         }
     }
 }
