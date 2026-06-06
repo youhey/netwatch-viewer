@@ -17,10 +17,7 @@ struct DNSSectionView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("DNS")
-                .font(.headline)
-
+        SectionCard(title: "DNS", subtitle: "Resolver latency") {
             if samples.isEmpty {
                 Text("No DNS samples.")
                     .foregroundStyle(.secondary)

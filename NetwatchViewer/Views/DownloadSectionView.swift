@@ -17,10 +17,7 @@ struct DownloadSectionView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Download")
-                .font(.headline)
-
+        SectionCard(title: "Download", subtitle: "Latest throughput probes") {
             if samples.isEmpty {
                 Text("No download samples.")
                     .foregroundStyle(.secondary)

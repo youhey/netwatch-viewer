@@ -17,10 +17,7 @@ struct HTTPSectionView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Services")
-                .font(.headline)
-
+        SectionCard(title: "Services", subtitle: "HTTP probe status and latency") {
             if samples.isEmpty {
                 Text("No HTTP samples.")
                     .foregroundStyle(.secondary)

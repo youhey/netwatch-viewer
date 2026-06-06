@@ -17,10 +17,7 @@ struct PingSectionView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Ping")
-                .font(.headline)
-
+        SectionCard(title: "Ping", subtitle: "Latest RTT and packet loss") {
             if samples.isEmpty {
                 Text("No ping samples.")
                     .foregroundStyle(.secondary)
