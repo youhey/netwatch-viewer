@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = DashboardViewModel()
+    @EnvironmentObject private var viewModel: DashboardViewModel
 
     var body: some View {
         ScrollView {
@@ -24,7 +24,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
         .task {
-            await viewModel.runAutoRefresh()
+            viewModel.startAutoRefresh()
         }
     }
 
@@ -124,4 +124,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(DashboardViewModel())
 }

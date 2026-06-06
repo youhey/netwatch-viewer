@@ -18,6 +18,7 @@ final class DashboardViewModel: ObservableObject {
 
     private let client: NetwatchClient
     private let refreshInterval: Duration
+    private var refreshTask: Task<Void, Never>?
 
     init(
         client: NetwatchClient? = nil,
@@ -25,6 +26,20 @@ final class DashboardViewModel: ObservableObject {
     ) {
         self.client = client ?? NetwatchClient()
         self.refreshInterval = refreshInterval
+    }
+
+    func startAutoRefresh() {
+        if refreshTask != nil {
+            return
+        }
+
+        refreshTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            await self.runAutoRefresh()
+        }
     }
 
     func runAutoRefresh() async {

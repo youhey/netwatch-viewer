@@ -9,9 +9,21 @@ import SwiftUI
 
 @main
 struct NetwatchViewerApp: App {
+    @StateObject private var viewModel = DashboardViewModel()
+
     var body: some Scene {
-        WindowGroup {
+        Window("NetwatchViewer", id: "dashboard") {
             ContentView()
+                .environmentObject(viewModel)
         }
+
+        MenuBarExtra {
+            MenuBarStatusView()
+                .environmentObject(viewModel)
+        } label: {
+            MenuBarLabelView()
+                .environmentObject(viewModel)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
