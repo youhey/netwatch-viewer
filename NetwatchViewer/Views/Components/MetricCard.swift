@@ -1,0 +1,108 @@
+//
+//  MetricCard.swift
+//  NetwatchViewer
+//
+//  Created by Codex on 2026/06/07.
+//
+
+import SwiftUI
+
+struct MetricCard: View {
+    let title: String
+    let value: String
+    let unit: String?
+    let subtitle: String?
+    let severity: MonitoringLevel
+
+    init(
+        title: String,
+        value: String,
+        unit: String? = nil,
+        subtitle: String? = nil,
+        severity: MonitoringLevel = .unknown
+    ) {
+        self.title = title
+        self.value = value
+        self.unit = unit
+        self.subtitle = subtitle
+        self.severity = severity
+    }
+
+    init(
+        title: String,
+        value: Double,
+        unit: String? = nil,
+        subtitle: String? = nil,
+        severity: MonitoringLevel = .unknown
+    ) {
+        self.init(
+            title: title,
+            value: value.formatted(.number.precision(.fractionLength(0...1))),
+            unit: unit,
+            subtitle: subtitle,
+            severity: severity
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                SeverityChip(level: severity)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(value)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+
+                if let unit {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(14)
+        .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(red: 0.08, green: 0.10, blue: 0.13))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(severity.dashboardAccentColor.opacity(0.28), lineWidth: 1)
+        )
+    }
+}
+
+#Preview {
+    Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+        GridRow {
+            MetricCard(title: "Gateway", value: 1.8, unit: "ms", subtitle: "OK", severity: .ok)
+            MetricCard(title: "External RTT", value: 12.0, unit: "ms", subtitle: "OK", severity: .ok)
+        }
+
+        GridRow {
+            MetricCard(title: "Packet Loss", value: 0.0, unit: "%", subtitle: "OK", severity: .ok)
+            MetricCard(title: "Download", value: 16.4, unit: "Mbps", subtitle: "R2 10MB", severity: .warning)
+        }
+    }
+    .padding()
+    .background(Color(red: 0.04, green: 0.05, blue: 0.07))
+}
