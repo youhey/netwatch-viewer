@@ -75,9 +75,9 @@ struct ContentView: View {
                         Text("Status")
                             .foregroundStyle(.secondary)
                             .frame(width: 80, alignment: .leading)
-                        Circle()
-                            .fill(statusColor(for: monitoringStatus.level))
-                            .frame(width: 8, height: 8)
+                        Image(statusImageName(for: monitoringStatus.level))
+                            .resizable()
+                            .frame(width: 16, height: 16)
                         Text(monitoringStatus.level.uppercased())
                             .fontWeight(.semibold)
                     }
@@ -110,14 +110,16 @@ struct ContentView: View {
         }
     }
 
-    private func statusColor(for level: String) -> Color {
+    private func statusImageName(for level: String) -> String {
         switch level.lowercased() {
         case "ok":
-            .green
+            "status-ok"
         case "warning":
-            .orange
+            "status-warning"
+        case "critical":
+            "status-critical"
         default:
-            .red
+            "status-unknown"
         }
     }
 }

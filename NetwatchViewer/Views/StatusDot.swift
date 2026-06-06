@@ -11,9 +11,9 @@ struct StatusDot: View {
     let ok: Bool
 
     var body: some View {
-        Circle()
-            .fill(ok ? Color.green : Color.red)
-            .frame(width: 8, height: 8)
+        Image(ok ? "status-ok" : "status-critical")
+            .resizable()
+            .frame(width: 10, height: 10)
             .accessibilityLabel(ok ? "OK" : "Error")
     }
 }

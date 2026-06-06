@@ -11,26 +11,37 @@ struct MenuBarLabelView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
 
     var body: some View {
-        Text(labelText)
+        Image(menuBarImageName)
+            .resizable()
+            .frame(width: 16, height: 16)
+            .accessibilityLabel(menuBarAccessibilityLabel)
             .task {
                 viewModel.startAutoRefresh()
             }
     }
 
-    private var labelText: String {
+    private var menuBarImageName: String {
         guard let level = viewModel.monitoringStatus?.level.lowercased() else {
-            return "NET ..."
+            return "menu-bar-unknown"
         }
 
         switch level {
         case "ok":
-            return "NET OK"
+            return "menu-bar-ok"
         case "warning":
-            return "NET WARN"
+            return "menu-bar-warning"
         case "critical":
-            return "NET CRIT"
+            return "menu-bar-critical"
         default:
-            return "NET ..."
+            return "menu-bar-unknown"
         }
+    }
+
+    private var menuBarAccessibilityLabel: String {
+        guard let level = viewModel.monitoringStatus?.level.uppercased() else {
+            return "Netwatch status unknown"
+        }
+
+        return "Netwatch status \(level)"
     }
 }
