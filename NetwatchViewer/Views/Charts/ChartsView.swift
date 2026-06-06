@@ -9,19 +9,23 @@ import SwiftUI
 
 struct ChartsView: View {
     @ObservedObject var viewModel: ChartsViewModel
+    @State private var selectedPingNames: Set<String> = []
+    @State private var selectedHTTPNames: Set<String> = []
+    @State private var selectedDownloadNames: Set<String> = []
+    @State private var selectedServiceGroups: Set<String> = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
 
-                PingLatencyChartView(series: viewModel.pingSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
-                PacketLossChartView(series: viewModel.pingSeries, catalog: viewModel.catalog)
-                HTTPDurationChartView(series: viewModel.httpSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
+                PingLatencyChartView(series: viewModel.pingSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedPingNames)
+                PacketLossChartView(series: viewModel.pingSeries, catalog: viewModel.catalog, selectedNames: $selectedPingNames)
+                HTTPDurationChartView(series: viewModel.httpSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedHTTPNames)
                 if viewModel.showsDownloadChart {
-                    DownloadThroughputChartView(series: viewModel.downloadSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog)
+                    DownloadThroughputChartView(series: viewModel.downloadSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedDownloadNames)
                 }
-                ServiceGroupChartView(series: viewModel.serviceSeries, catalog: viewModel.catalog)
+                ServiceGroupChartView(series: viewModel.serviceSeries, catalog: viewModel.catalog, selectedGroups: $selectedServiceGroups)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding()
@@ -57,6 +61,7 @@ struct ChartsView: View {
                 .frame(width: 120)
 
                 Button {
+                    resetChartSelections()
                     Task {
                         await viewModel.refresh()
                     }
@@ -146,5 +151,12 @@ struct ChartsView: View {
 
     private func formatDateTime(_ date: Date) -> String {
         date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func resetChartSelections() {
+        selectedPingNames = []
+        selectedHTTPNames = []
+        selectedDownloadNames = []
+        selectedServiceGroups = []
     }
 }

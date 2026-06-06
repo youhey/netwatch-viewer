@@ -25,7 +25,6 @@ struct ChartSection<Content: View>: View {
                     .frame(maxWidth: .infinity)
             } else {
                 content
-                    .frame(height: 260)
             }
         }
     }

@@ -11,11 +11,40 @@ import SwiftUI
 struct PacketLossChartView: View {
     let series: [PingChartSeries]
     let catalog: ChartCatalog?
+    @Binding var selectedNames: Set<String>
 
     private var points: [ChartValuePoint] {
+        chartPoints(from: visibleSeries)
+    }
+
+    private var allPoints: [ChartValuePoint] {
+        chartPoints(from: series)
+    }
+
+    var body: some View {
+        ChartSection(title: "Packet Loss", emptyMessage: "No packet loss points.", isEmpty: allPoints.isEmpty) {
+            VStack(alignment: .leading, spacing: 8) {
+                ChartSeriesSelector(items: selectableItems, selectedIDs: $selectedNames)
+
+                Chart(points) { point in
+                    LineMark(
+                        x: .value("Time", point.ts),
+                        y: .value("Loss", point.value)
+                    )
+                    .foregroundStyle(by: .value("Probe", point.series))
+                }
+                .chartYAxisLabel("%")
+                .chartLegend(.hidden)
+                .chartForegroundStyleScale(domain: colorDomain, range: colorRange)
+                .frame(height: 260)
+            }
+        }
+    }
+
+    private func chartPoints(from sourceSeries: [PingChartSeries]) -> [ChartValuePoint] {
         let labels = pingLabels
 
-        return series.flatMap { series in
+        return sourceSeries.flatMap { series in
             series.points.compactMap { point -> ChartValuePoint? in
                 guard (point.sampleCount ?? 0) > 0, let value = point.lossPercent else {
                     return nil
@@ -31,17 +60,27 @@ struct PacketLossChartView: View {
         }
     }
 
-    var body: some View {
-        ChartSection(title: "Packet Loss", emptyMessage: "No packet loss points.", isEmpty: points.isEmpty) {
-            Chart(points) { point in
-                LineMark(
-                    x: .value("Time", point.ts),
-                    y: .value("Loss", point.value)
-                )
-                .foregroundStyle(by: .value("Probe", point.series))
-            }
-            .chartYAxisLabel("%")
+    private var visibleSeries: [PingChartSeries] {
+        selectedNames.isEmpty ? series : series.filter { selectedNames.contains($0.name) }
+    }
+
+    private var selectableItems: [ChartSelectableItem] {
+        let labels = pingLabels
+        return series.enumerated().map { index, series in
+            ChartSelectableItem(
+                id: series.name,
+                title: series.displayName ?? labels[series.name] ?? series.name,
+                color: ChartSeriesPalette.color(at: index)
+            )
         }
+    }
+
+    private var colorDomain: [String] {
+        selectableItems.map(\.title)
+    }
+
+    private var colorRange: [Color] {
+        selectableItems.map(\.color)
     }
 
     private var pingLabels: [String: String] {

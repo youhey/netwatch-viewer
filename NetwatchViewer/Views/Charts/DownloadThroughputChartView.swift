@@ -12,11 +12,80 @@ struct DownloadThroughputChartView: View {
     let series: [DownloadChartSeries]
     let thresholds: MonitoringThresholds?
     let catalog: ChartCatalog?
+    @Binding var selectedNames: Set<String>
 
     private var averagePoints: [ChartValuePoint] {
+        averagePoints(from: visibleSeries)
+    }
+
+    private var allAveragePoints: [ChartValuePoint] {
+        averagePoints(from: series)
+    }
+
+    private var maxPoints: [ChartValuePoint] {
+        maxPoints(from: visibleSeries)
+    }
+
+    private var thresholdMarks: [DownloadThresholdMark] {
+        thresholdMarks(from: visibleSeries)
+    }
+
+    private var isEmpty: Bool {
+        allAveragePoints.isEmpty
+    }
+
+    var body: some View {
+        ChartSection(
+            title: "Download Throughput (lower is worse)",
+            emptyMessage: "Download data is not available yet.",
+            isEmpty: isEmpty
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                ChartSeriesSelector(items: selectableItems, selectedIDs: $selectedNames)
+
+                Chart {
+                    ForEach(averagePoints) { point in
+                        LineMark(
+                            x: .value("Time", point.ts),
+                            y: .value("Throughput", point.value)
+                        )
+                        .foregroundStyle(by: .value("Download", point.series))
+
+                        PointMark(
+                            x: .value("Time", point.ts),
+                            y: .value("Throughput", point.value)
+                        )
+                        .foregroundStyle(by: .value("Download", point.series))
+                    }
+
+                    ForEach(maxPoints) { point in
+                        LineMark(
+                            x: .value("Time", point.ts),
+                            y: .value("Max throughput", point.value)
+                        )
+                        .foregroundStyle(by: .value("Download", point.series))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .opacity(0.45)
+                    }
+
+                    ForEach(thresholdMarks) { mark in
+                        RuleMark(y: .value(mark.title, mark.value))
+                            .foregroundStyle(mark.color)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    }
+                }
+                .chartYAxisLabel("Mbps")
+                .chartLegend(.hidden)
+                .chartForegroundStyleScale(domain: colorDomain, range: colorRange)
+                .frame(height: 260)
+            }
+        }
+    }
+
+    private func averagePoints(from sourceSeries: [DownloadChartSeries]) -> [ChartValuePoint] {
         let labels = downloadLabels
 
-        return series.flatMap { series in
+        return sourceSeries.flatMap { series in
             series.points.compactMap { point -> ChartValuePoint? in
                 guard point.sampleCount > 0, let value = point.avgMbps else {
                     return nil
@@ -32,10 +101,10 @@ struct DownloadThroughputChartView: View {
         }
     }
 
-    private var maxPoints: [ChartValuePoint] {
+    private func maxPoints(from sourceSeries: [DownloadChartSeries]) -> [ChartValuePoint] {
         let labels = downloadLabels
 
-        return series.flatMap { series in
+        return sourceSeries.flatMap { series in
             series.points.compactMap { point -> ChartValuePoint? in
                 guard
                     point.sampleCount > 0,
@@ -48,7 +117,7 @@ struct DownloadThroughputChartView: View {
 
                 return ChartValuePoint(
                     id: "\(series.name)-max-\(point.ts.timeIntervalSince1970)",
-                    series: "\(series.displayName ?? labels[series.name] ?? series.name) max",
+                    series: series.displayName ?? labels[series.name] ?? series.name,
                     ts: point.ts,
                     value: value
                 )
@@ -56,10 +125,10 @@ struct DownloadThroughputChartView: View {
         }
     }
 
-    private var thresholdMarks: [DownloadThresholdMark] {
+    private func thresholdMarks(from sourceSeries: [DownloadChartSeries]) -> [DownloadThresholdMark] {
         let labels = downloadLabels
 
-        return series.flatMap { series -> [DownloadThresholdMark] in
+        return sourceSeries.flatMap { series -> [DownloadThresholdMark] in
             guard let band = thresholds?.download?.threshold(for: series.name) else {
                 return []
             }
@@ -92,49 +161,27 @@ struct DownloadThroughputChartView: View {
         }
     }
 
-    private var isEmpty: Bool {
-        averagePoints.isEmpty
+    private var visibleSeries: [DownloadChartSeries] {
+        selectedNames.isEmpty ? series : series.filter { selectedNames.contains($0.name) }
     }
 
-    var body: some View {
-        ChartSection(
-            title: "Download Throughput (lower is worse)",
-            emptyMessage: "Download data is not available yet.",
-            isEmpty: isEmpty
-        ) {
-            Chart {
-                ForEach(averagePoints) { point in
-                    LineMark(
-                        x: .value("Time", point.ts),
-                        y: .value("Throughput", point.value)
-                    )
-                    .foregroundStyle(by: .value("Download", point.series))
-
-                    PointMark(
-                        x: .value("Time", point.ts),
-                        y: .value("Throughput", point.value)
-                    )
-                    .foregroundStyle(by: .value("Download", point.series))
-                }
-
-                ForEach(maxPoints) { point in
-                    LineMark(
-                        x: .value("Time", point.ts),
-                        y: .value("Max throughput", point.value)
-                    )
-                    .foregroundStyle(by: .value("Download", point.series))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    .opacity(0.45)
-                }
-
-                ForEach(thresholdMarks) { mark in
-                    RuleMark(y: .value(mark.title, mark.value))
-                        .foregroundStyle(mark.color)
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                }
-            }
-            .chartYAxisLabel("Mbps")
+    private var selectableItems: [ChartSelectableItem] {
+        let labels = downloadLabels
+        return series.enumerated().map { index, series in
+            ChartSelectableItem(
+                id: series.name,
+                title: series.displayName ?? labels[series.name] ?? series.name,
+                color: ChartSeriesPalette.color(at: index)
+            )
         }
+    }
+
+    private var colorDomain: [String] {
+        selectableItems.map(\.title)
+    }
+
+    private var colorRange: [Color] {
+        selectableItems.map(\.color)
     }
 
     private var downloadLabels: [String: String] {
