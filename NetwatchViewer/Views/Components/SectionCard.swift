@@ -22,26 +22,7 @@ struct SectionCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 9) {
-                if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Self.metricAccent)
-                        .frame(width: 20, alignment: .leading)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            SectionHeaderView(title: title, subtitle: subtitle, systemImage: systemImage)
 
             content
         }
@@ -58,13 +39,49 @@ struct SectionCard<Content: View>: View {
         .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 5)
     }
 
-    private static var metricAccent: Color {
+}
+
+struct SectionHeaderView: View {
+    let title: String
+    let subtitle: String?
+    let systemImage: String?
+
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Self.iconColor)
+                    .frame(width: 20, alignment: .leading)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.62))
+                }
+            }
+        }
+    }
+
+    private static var iconColor: Color {
         Color(red: 0.28, green: 0.78, blue: 0.96)
     }
 }
 
 #Preview {
-    SectionCard(title: "Ping", subtitle: "Latest probe status") {
+    SectionCard(title: "Ping", subtitle: "Latest probe status", systemImage: "antenna.radiowaves.left.and.right") {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Gateway")

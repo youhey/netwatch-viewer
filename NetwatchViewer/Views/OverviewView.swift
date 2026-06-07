@@ -12,6 +12,7 @@ struct OverviewView: View {
     let latest: LatestResponse?
     let thresholds: MonitoringThresholds?
     let overviewChart: ChartsOverviewResponse?
+    let statusHistoryBuckets: [StatusHistoryBucket]
     let lastUpdated: Date?
     let alertState: AlertState
 
@@ -29,7 +30,6 @@ struct OverviewView: View {
         VStack(alignment: .leading, spacing: 16) {
             statusOverview
             metricsGrid
-            activeIssues
             detailSections
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -38,9 +38,8 @@ struct OverviewView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             statusHistory
-            latencyMiniChart
+            activeIssues
             thresholdsSummary
-            systemInfo
         }
         .frame(width: 300, alignment: .topLeading)
     }
@@ -81,7 +80,7 @@ struct OverviewView: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
-            SectionCard(title: "Latest Data") {
+            SectionCard(title: "Latest Data", systemImage: "tray.full") {
                 Text("No latest data loaded.")
                     .foregroundStyle(.secondary)
             }
@@ -89,61 +88,37 @@ struct OverviewView: View {
     }
 
     private var statusHistory: some View {
-        SectionCard(title: "Status History", subtitle: "Last 24h") {
-            VStack(alignment: .leading, spacing: 10) {
-                if let status {
-                    HStack(spacing: 4) {
-                        ForEach(0..<18, id: \.self) { index in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(index == 17 ? status.level.dashboardAccentColor : status.level.dashboardAccentColor.opacity(0.28))
-                                .frame(height: index == 17 ? 18 : 12)
+        SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 4) {
+                    ForEach(statusHistoryBuckets) { bucket in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(bucket.level.dashboardAccentColor)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 16)
+                            .opacity(bucket.level == .unknown ? 0.55 : 0.9)
+                    }
+                }
+                .frame(height: 18)
+
+                LazyVGrid(columns: statusLegendColumns, alignment: .leading, spacing: 7) {
+                    ForEach(statusLegendLevels, id: \.rawValue) { level in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(level.dashboardAccentColor)
+                                .frame(width: 7, height: 7)
+
+                            Text(level.dashboardLegendLabel)
+                                .font(.caption2)
+                                .foregroundStyle(Color.white.opacity(0.72))
                         }
                     }
-                    .frame(height: 20)
-
-                    HStack {
-                        SeverityChip(level: status.level)
-                        Text("Current state only")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("No status history available yet.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
-            }
-        }
-    }
 
-    private var latencyMiniChart: some View {
-        SectionCard(title: "Latency", subtitle: "Current ping probes") {
-            if let latest, !latest.ping.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(sortedPingSamples(latest.ping).prefix(3)), id: \.name) { sample in
-                        LatencyMiniRow(sample: sample, severity: evaluator.severityForPing(sample))
-                    }
-                }
-            } else {
-                Text("No latency data loaded.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Observed while viewer is running")
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.58))
             }
-        }
-    }
-
-    private var systemInfo: some View {
-        SectionCard(title: "System Info", subtitle: "Viewer runtime") {
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 7) {
-                overviewRow(label: "Viewer", value: viewerVersion)
-                overviewRow(label: "API", value: "http://netpi:8080")
-                overviewRow(label: "Refresh", value: "10s")
-                overviewRow(label: "Updated", value: formatOptionalDate(lastUpdated))
-                overviewRow(label: "Observed", value: alertState.lastObservedLevel?.dashboardLabel ?? "-")
-                overviewRow(label: "Muted", value: formatOptionalDate(alertState.mutedUntil))
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
     }
 
@@ -159,12 +134,20 @@ struct OverviewView: View {
         Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16), count: 3)
     }
 
+    private var statusLegendColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 2)
+    }
+
+    private var statusLegendLevels: [MonitoringLevel] {
+        [.ok, .warning, .critical, .unknown]
+    }
+
     @ViewBuilder
     private var statusOverview: some View {
         if let status {
             StatusSummaryCard(status: status, updatedAt: lastUpdated, alertState: alertState)
         } else {
-            SectionCard(title: "Status") {
+            SectionCard(title: "Status", systemImage: "shield.lefthalf.filled") {
                 Text("No status loaded.")
                     .foregroundStyle(Color.white.opacity(0.68))
             }
@@ -172,7 +155,7 @@ struct OverviewView: View {
     }
 
     private var activeIssues: some View {
-        SectionCard(title: "Active Issues", subtitle: "Current monitoring reasons") {
+        SectionCard(title: "Active Issues", subtitle: "Current monitoring reasons", systemImage: "shield.lefthalf.filled") {
             if let status {
                 if status.reasons.isEmpty {
                     HStack(spacing: 8) {
@@ -195,7 +178,7 @@ struct OverviewView: View {
     }
 
     private var thresholdsSummary: some View {
-        SectionCard(title: "Thresholds", subtitle: "Warning and critical bands") {
+        SectionCard(title: "Thresholds", subtitle: "Warning and critical bands", systemImage: "slider.horizontal.3") {
             if let thresholds {
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                     thresholdText("Gateway RTT", band: thresholds.ping?.gatewayRttAvgMs, unit: "ms", mode: .high)
@@ -449,26 +432,6 @@ struct OverviewView: View {
         return [0.72, 0.66, 0.78, 0.62, 0.85, 0.70, 0.92, 0.76].map { base * $0 }
     }
 
-    private func formatOptionalDate(_ date: Date?) -> String {
-        guard let date else {
-            return "-"
-        }
-
-        return date.formatted(date: .omitted, time: .standard)
-    }
-
-    private func overviewRow(label: String, value: String) -> some View {
-        GridRow {
-            Text(label)
-                .foregroundStyle(Color.white.opacity(0.68))
-                .frame(width: 72, alignment: .leading)
-            Text(value)
-                .foregroundStyle(Color.white.opacity(0.78))
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-    }
-
     private func thresholdText(_ label: String, band: ThresholdBand?, unit: String, mode: ThresholdMode) -> some View {
         GridRow {
             Text(label)
@@ -516,19 +479,6 @@ struct OverviewView: View {
             .sorted { $0.label < $1.label } ?? []
     }
 
-    private var viewerVersion: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-
-        switch (version, build) {
-        case let (version?, build?):
-            return "v\(version) (\(build))"
-        case let (version?, nil):
-            return "v\(version)"
-        default:
-            return "-"
-        }
-    }
 }
 
 private enum ThresholdMode {
@@ -571,44 +521,6 @@ private struct DashboardMetric: Identifiable {
     }
 }
 
-private struct LatencyMiniRow: View {
-    let sample: PingSample
-    let severity: MonitoringLevel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Text(sample.displayName ?? sample.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(formatMilliseconds(sample.rttAvgMs))
-                    .font(.caption)
-                    .foregroundStyle(severity == .ok ? Color.secondary : severity.dashboardAccentColor)
-                    .monospacedDigit()
-            }
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 5)
-
-                Capsule()
-                    .fill(severity.dashboardAccentColor.opacity(0.78))
-                    .frame(width: barWidth, height: 5)
-            }
-        }
-    }
-
-    private var barWidth: CGFloat {
-        let value = sample.rttAvgMs ?? 0
-        return CGFloat(min(max(value / 200, 0.04), 1) * 170)
-    }
-}
-
 private struct ActiveIssueRow: View {
     let reason: MonitoringReason
     let isPrimary: Bool
@@ -633,6 +545,21 @@ private struct ActiveIssueRow: View {
                     .font(.caption)
                     .foregroundStyle(Color.white.opacity(0.68))
             }
+        }
+    }
+}
+
+private extension MonitoringLevel {
+    var dashboardLegendLabel: String {
+        switch self {
+        case .ok:
+            return "OK"
+        case .warning:
+            return "Warning"
+        case .critical:
+            return "Critical"
+        case .unknown:
+            return "Unknown"
         }
     }
 }

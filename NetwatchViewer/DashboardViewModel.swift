@@ -23,10 +23,12 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var lastNotificationDate: Date?
     @Published private(set) var notificationErrorMessage: String?
     @Published private(set) var alertState: AlertState
+    @Published private(set) var statusHistoryBuckets: [StatusHistoryBucket]
 
     private let client: NetwatchClient
     private let notificationManager: NotificationManager
     private let alertController: AlertController
+    private var statusHistoryStore: StatusHistoryStore
     private let refreshInterval: Duration
     private let overviewChartRefreshInterval: Duration
     private var refreshTask: Task<Void, Never>?
@@ -45,6 +47,8 @@ final class DashboardViewModel: ObservableObject {
         let resolvedAlertController = alertController ?? AlertController()
         self.alertController = resolvedAlertController
         alertState = resolvedAlertController.state
+        statusHistoryStore = StatusHistoryStore()
+        statusHistoryBuckets = statusHistoryStore.buckets()
         self.refreshInterval = refreshInterval
         self.overviewChartRefreshInterval = overviewChartRefreshInterval
 
@@ -101,6 +105,7 @@ final class DashboardViewModel: ObservableObject {
         do {
             let status = try await client.fetchMonitoringStatus()
             monitoringStatus = status
+            statusHistoryBuckets = statusHistoryStore.record(status: status)
             didUpdate = true
             await notifyIfNeeded(status: status)
             alertController.recordObserved(status)

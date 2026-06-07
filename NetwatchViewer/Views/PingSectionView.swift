@@ -18,7 +18,7 @@ struct PingSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "Ping", subtitle: "Latest RTT and packet loss", systemImage: "network") {
+        SectionCard(title: "Ping", subtitle: "Latest RTT and packet loss", systemImage: "antenna.radiowaves.left.and.right") {
             if samples.isEmpty {
                 Text("No ping samples.")
                     .foregroundStyle(.secondary)
