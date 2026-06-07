@@ -15,19 +15,12 @@ struct OverviewView: View {
     let alertState: AlertState
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 16) {
-                mainColumn
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+        HStack(alignment: .top, spacing: 16) {
+            mainColumn
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
 
-                sidebar
-                    .frame(width: 300, alignment: .topLeading)
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                mainColumn
-                sidebar
-            }
+            sidebar
+                .frame(width: 300, alignment: .topLeading)
         }
     }
 
@@ -38,6 +31,7 @@ struct OverviewView: View {
             activeIssues
             detailSections
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var sidebar: some View {
@@ -47,6 +41,7 @@ struct OverviewView: View {
             thresholdsSummary
             systemInfo
         }
+        .frame(width: 300, alignment: .topLeading)
     }
 
     private var metricsGrid: some View {
@@ -68,12 +63,22 @@ struct OverviewView: View {
     @ViewBuilder
     private var detailSections: some View {
         if let latest {
-            LazyVGrid(columns: detailColumns, alignment: .leading, spacing: 16) {
-                PingSectionView(samples: latest.ping, evaluator: evaluator)
-                DNSSectionView(samples: latest.dns, evaluator: evaluator)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
+                    PingSectionView(samples: latest.ping, evaluator: evaluator)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+
+                    DNSSectionView(samples: latest.dns, evaluator: evaluator)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+
+                    DownloadSectionView(samples: latest.download, evaluator: evaluator)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+                }
+
                 HTTPSectionView(samples: latest.http, evaluator: evaluator)
-                DownloadSectionView(samples: latest.download, evaluator: evaluator)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
             SectionCard(title: "Latest Data") {
                 Text("No latest data loaded.")
@@ -148,12 +153,6 @@ struct OverviewView: View {
     private var metricColumns: [GridItem] {
         [
             GridItem(.adaptive(minimum: 155), spacing: 12)
-        ]
-    }
-
-    private var detailColumns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: 340), spacing: 16)
         ]
     }
 
