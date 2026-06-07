@@ -29,6 +29,12 @@ struct StatusHistoryBucket: Identifiable {
     let level: MonitoringLevel
 }
 
+enum StatusHistorySource: Equatable {
+    case api
+    case observed
+    case unavailable
+}
+
 struct StatusHistoryStore {
     private static let lookback: TimeInterval = 24 * 60 * 60
 
@@ -40,6 +46,10 @@ struct StatusHistoryStore {
         self.storage = storage
         self.storageKey = storageKey
         points = Self.loadPoints(storage: storage, storageKey: storageKey)
+    }
+
+    var hasPoints: Bool {
+        !points.isEmpty
     }
 
     mutating func record(status: MonitoringStatus, observedAt: Date = Date()) -> [StatusHistoryBucket] {
@@ -106,5 +116,19 @@ struct StatusHistoryStore {
         }
 
         return level
+    }
+}
+
+extension MonitoringStatusHistoryResponse {
+    var historyBuckets: [StatusHistoryBucket] {
+        points
+            .sorted { $0.bucketStart < $1.bucketStart }
+            .map { point in
+                StatusHistoryBucket(
+                    start: point.bucketStart,
+                    end: point.bucketEnd ?? point.bucketStart.addingTimeInterval(TimeInterval(bucketSeconds ?? 3600)),
+                    level: point.level
+                )
+            }
     }
 }

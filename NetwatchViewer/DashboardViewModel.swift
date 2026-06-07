@@ -23,6 +23,10 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var lastNotificationDate: Date?
     @Published private(set) var notificationErrorMessage: String?
     @Published private(set) var alertState: AlertState
+    @Published private(set) var statusHistory: MonitoringStatusHistoryResponse?
+    @Published private(set) var statusHistoryLastUpdated: Date?
+    @Published private(set) var statusHistoryError: String?
+    @Published private(set) var statusHistorySource: StatusHistorySource
     @Published private(set) var statusHistoryBuckets: [StatusHistoryBucket]
 
     private let client: NetwatchClient
@@ -48,7 +52,8 @@ final class DashboardViewModel: ObservableObject {
         self.alertController = resolvedAlertController
         alertState = resolvedAlertController.state
         statusHistoryStore = StatusHistoryStore()
-        statusHistoryBuckets = statusHistoryStore.buckets()
+        statusHistoryBuckets = statusHistoryStore.hasPoints ? statusHistoryStore.buckets() : []
+        statusHistorySource = statusHistoryStore.hasPoints ? .observed : .unavailable
         self.refreshInterval = refreshInterval
         self.overviewChartRefreshInterval = overviewChartRefreshInterval
 
@@ -80,6 +85,7 @@ final class DashboardViewModel: ObservableObject {
 
     func runOverviewChartAutoRefresh() async {
         await refreshOverviewChart()
+        await refreshMonitoringStatusHistory()
 
         while !Task.isCancelled {
             do {
@@ -89,7 +95,14 @@ final class DashboardViewModel: ObservableObject {
             }
 
             await refreshOverviewChart()
+            await refreshMonitoringStatusHistory()
         }
+    }
+
+    func reload() async {
+        await refresh()
+        await refreshOverviewChart()
+        await refreshMonitoringStatusHistory()
     }
 
     func refresh() async {
@@ -105,7 +118,11 @@ final class DashboardViewModel: ObservableObject {
         do {
             let status = try await client.fetchMonitoringStatus()
             monitoringStatus = status
-            statusHistoryBuckets = statusHistoryStore.record(status: status)
+            let observedBuckets = statusHistoryStore.record(status: status)
+            if statusHistory == nil {
+                statusHistoryBuckets = observedBuckets
+                statusHistorySource = .observed
+            }
             didUpdate = true
             await notifyIfNeeded(status: status)
             alertController.recordObserved(status)
@@ -149,6 +166,23 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             overviewChart = nil
             overviewChartError = "Charts overview: \(error.localizedDescription)"
+        }
+    }
+
+    func refreshMonitoringStatusHistory() async {
+        do {
+            let response = try await client.fetchMonitoringStatusHistory(range: "24h", bucket: "1h")
+            statusHistory = response
+            statusHistoryBuckets = response.historyBuckets
+            statusHistoryLastUpdated = Date()
+            statusHistoryError = nil
+            statusHistorySource = .api
+        } catch {
+            statusHistoryError = "Status history: \(error.localizedDescription)"
+
+            if statusHistory == nil {
+                syncObservedStatusHistoryFallback()
+            }
         }
     }
 
@@ -216,6 +250,16 @@ final class DashboardViewModel: ObservableObject {
             }
 
             await self.runOverviewChartAutoRefresh()
+        }
+    }
+
+    private func syncObservedStatusHistoryFallback() {
+        if statusHistoryStore.hasPoints {
+            statusHistoryBuckets = statusHistoryStore.buckets()
+            statusHistorySource = .observed
+        } else {
+            statusHistoryBuckets = []
+            statusHistorySource = .unavailable
         }
     }
 

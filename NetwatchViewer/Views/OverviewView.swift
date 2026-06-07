@@ -12,6 +12,9 @@ struct OverviewView: View {
     let latest: LatestResponse?
     let thresholds: MonitoringThresholds?
     let overviewChart: ChartsOverviewResponse?
+    let statusHistory: MonitoringStatusHistoryResponse?
+    let statusHistorySource: StatusHistorySource
+    let statusHistoryError: String?
     let statusHistoryBuckets: [StatusHistoryBucket]
     let lastUpdated: Date?
     let alertState: AlertState
@@ -37,7 +40,7 @@ struct OverviewView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
-            statusHistory
+            statusHistorySection
             thresholdsSummary
             activeIssues
                 .frame(maxHeight: .infinity, alignment: .topLeading)
@@ -89,19 +92,25 @@ struct OverviewView: View {
         }
     }
 
-    private var statusHistory: some View {
+    private var statusHistorySection: some View {
         SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath", fillsVertically: false) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 4) {
-                    ForEach(statusHistoryBuckets) { bucket in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(bucket.level.dashboardAccentColor)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 16)
-                            .opacity(bucket.level == .unknown ? 0.55 : 0.9)
+                if statusHistoryBuckets.isEmpty {
+                    Text("Status history is not available yet.")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.64))
+                } else {
+                    HStack(spacing: 4) {
+                        ForEach(statusHistoryBuckets) { bucket in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(bucket.level.dashboardAccentColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 16)
+                                .opacity(bucket.level == .unknown ? 0.55 : 0.9)
+                        }
                     }
+                    .frame(height: 18)
                 }
-                .frame(height: 18)
 
                 LazyVGrid(columns: statusLegendColumns, alignment: .leading, spacing: 7) {
                     ForEach(statusLegendLevels, id: \.rawValue) { level in
@@ -117,9 +126,26 @@ struct OverviewView: View {
                     }
                 }
 
-                Text("Observed while viewer is running")
-                    .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.58))
+                if let summaryText = statusHistorySummaryText {
+                    Text(summaryText)
+                        .font(.caption2)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                        .lineLimit(1)
+                }
+
+                if let metadataText = statusHistoryMetadataText {
+                    Text(metadataText)
+                        .font(.caption2)
+                        .foregroundStyle(Color.white.opacity(0.58))
+                        .lineLimit(1)
+                }
+
+                if let statusHistoryError, statusHistorySource != .api {
+                    Text(statusHistoryError)
+                        .font(.caption2)
+                        .foregroundStyle(Color.red.opacity(0.82))
+                        .lineLimit(2)
+                }
             }
         }
     }
@@ -142,6 +168,35 @@ struct OverviewView: View {
 
     private var statusLegendLevels: [MonitoringLevel] {
         [.ok, .warning, .critical, .unknown]
+    }
+
+    private var statusHistoryMetadataText: String? {
+        switch statusHistorySource {
+        case .api:
+            guard let statusHistory else {
+                return nil
+            }
+
+            var parts = ["Bucket: \(statusHistory.bucket)"]
+
+            if let generatedAt = statusHistory.generatedAt {
+                parts.append("Generated: \(formatHistoryTime(generatedAt))")
+            }
+
+            return parts.joined(separator: "  ")
+        case .observed:
+            return "Observed while viewer is running"
+        case .unavailable:
+            return nil
+        }
+    }
+
+    private var statusHistorySummaryText: String? {
+        guard statusHistorySource == .api, let summary = statusHistory?.summary else {
+            return nil
+        }
+
+        return "OK \(summary.okCount) / WARN \(summary.warningCount) / CRIT \(summary.criticalCount) / UNK \(summary.unknownCount)"
     }
 
     @ViewBuilder
@@ -475,6 +530,10 @@ struct OverviewView: View {
 
     private func thresholdDirection(_ mode: ThresholdMode) -> String {
         mode == .high ? ">=" : "<"
+    }
+
+    private func formatHistoryTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
     }
 
     private func downloadThresholdRows(_ thresholds: MonitoringThresholds) -> [DownloadThresholdRow] {

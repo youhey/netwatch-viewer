@@ -46,6 +46,16 @@ struct NetwatchClient {
         try await fetch(path: "/api/monitoring/thresholds")
     }
 
+    func fetchMonitoringStatusHistory(range: String = "24h", bucket: String = "1h") async throws -> MonitoringStatusHistoryResponse {
+        try await fetch(
+            path: "/api/monitoring/status/history",
+            queryItems: [
+                URLQueryItem(name: "range", value: range),
+                URLQueryItem(name: "bucket", value: bucket)
+            ]
+        )
+    }
+
     func fetchDownloadLatest() async throws -> DownloadLatestResponse {
         try await fetch(path: "/api/download/latest")
     }

@@ -39,6 +39,9 @@ struct ContentView: View {
                     latest: viewModel.latest,
                     thresholds: viewModel.thresholds,
                     overviewChart: viewModel.overviewChart,
+                    statusHistory: viewModel.statusHistory,
+                    statusHistorySource: viewModel.statusHistorySource,
+                    statusHistoryError: viewModel.statusHistoryError,
                     statusHistoryBuckets: viewModel.statusHistoryBuckets,
                     lastUpdated: viewModel.lastUpdated,
                     alertState: viewModel.alertState
@@ -82,7 +85,7 @@ struct ContentView: View {
 
                     Button {
                         Task {
-                            await viewModel.refresh()
+                            await viewModel.reload()
                         }
                     } label: {
                         Label("Reload", systemImage: "arrow.clockwise")
