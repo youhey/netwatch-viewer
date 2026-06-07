@@ -25,11 +25,11 @@ struct SeverityChip: View {
         .padding(.vertical, 4)
         .background(
             Capsule()
-                .fill(level.dashboardAccentColor.opacity(0.12))
+                .fill(level.dashboardAccentColor.opacity(0.14))
         )
         .overlay(
             Capsule()
-                .stroke(level.dashboardAccentColor.opacity(0.35), lineWidth: 1)
+                .stroke(level.dashboardAccentColor.opacity(0.42), lineWidth: 1)
         )
     }
 }

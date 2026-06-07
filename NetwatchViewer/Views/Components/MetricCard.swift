@@ -85,7 +85,7 @@ struct MetricCard: View {
                     if let unit {
                         Text(unit)
                             .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.white.opacity(0.68))
                     }
                 }
 
@@ -97,7 +97,7 @@ struct MetricCard: View {
             if let subtitle {
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.68))
                     .lineLimit(2)
             }
 
@@ -197,8 +197,8 @@ private struct MiniSparkline: View {
         }
 
         GridRow {
-            MetricCard(title: "Packet Loss", value: 0.0, unit: "%", subtitle: "OK", severity: .ok)
-            MetricCard(title: "Download", value: 16.4, unit: "Mbps", subtitle: "R2 10MB", severity: .warning)
+            MetricCard(title: "Packet Loss", value: 0.0, unit: "%", severity: .unknown, sparkline: Array(repeating: 0, count: 8))
+            MetricCard(title: "Download", value: 16.4, unit: "Mbps", severity: .critical, sparkline: [10, 8, 6, 5, 4, 3, 3, 2])
         }
     }
     .padding()

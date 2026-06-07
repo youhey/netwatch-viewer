@@ -23,13 +23,13 @@ struct HTTPSectionView: View {
                 Text("No HTTP samples.")
                     .foregroundStyle(.secondary)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 9) {
+                Grid(alignment: .leading, horizontalSpacing: 22, verticalSpacing: 11) {
                     GridRow {
                         tableHeader("Status")
                         tableHeader("Service")
                         tableHeader("Group")
                         tableHeader("Category")
-                        tableHeader("HTTP Status")
+                        tableHeader("HTTP")
                         tableHeader("Total")
                         tableHeader("TTFB")
                     }
@@ -41,7 +41,7 @@ struct HTTPSectionView: View {
                         HTTPRowView(sample: sample, severity: evaluator.severityForHTTP(sample))
                     }
                 }
-                .font(.system(.callout, design: .monospaced))
+                .font(.system(size: 13, design: .monospaced))
             }
         }
     }
@@ -54,23 +54,35 @@ private struct HTTPRowView: View {
     var body: some View {
         GridRow {
             SeverityChip(level: severity)
+                .padding(.vertical, 3)
             Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .padding(.vertical, 3)
             Text(sample.group ?? "-")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(tableSecondary)
+                .padding(.vertical, 3)
             Text(sample.category ?? "-")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(tableSecondary)
+                .padding(.vertical, 3)
             Text(formatHTTPStatus(sample.httpStatus))
-                .foregroundStyle(sample.ok ? Color.secondary : Color.red)
+                .foregroundStyle(sample.ok ? tableSecondary : Color.red)
+                .padding(.vertical, 3)
             Text(formatMilliseconds(sample.totalMs))
                 .foregroundStyle(valueColor)
+                .padding(.vertical, 3)
             Text(formatMilliseconds(sample.ttfbMs))
                 .foregroundStyle(valueColor)
+                .padding(.vertical, 3)
         }
     }
 
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
+    }
+
+    private var tableSecondary: Color {
+        Color.white.opacity(0.68)
     }
 }
 
@@ -78,5 +90,5 @@ private func tableHeader(_ title: String) -> some View {
     Text(title)
         .font(.caption)
         .fontWeight(.semibold)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.white.opacity(0.72))
 }

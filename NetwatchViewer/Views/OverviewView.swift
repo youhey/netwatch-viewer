@@ -11,6 +11,7 @@ struct OverviewView: View {
     let status: MonitoringStatus?
     let latest: LatestResponse?
     let thresholds: MonitoringThresholds?
+    let overviewChart: ChartsOverviewResponse?
     let lastUpdated: Date?
     let alertState: AlertState
 
@@ -165,7 +166,7 @@ struct OverviewView: View {
         } else {
             SectionCard(title: "Status") {
                 Text("No status loaded.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.68))
             }
         }
     }
@@ -196,7 +197,7 @@ struct OverviewView: View {
     private var thresholdsSummary: some View {
         SectionCard(title: "Thresholds", subtitle: "Warning and critical bands") {
             if let thresholds {
-                VStack(alignment: .leading, spacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                     thresholdText("Gateway RTT", band: thresholds.ping?.gatewayRttAvgMs, unit: "ms", mode: .high)
                     thresholdText("Gateway Loss", band: thresholds.ping?.gatewayLossPercent, unit: "%", mode: .high)
                     thresholdText("External RTT", band: thresholds.ping?.externalRttAvgMs, unit: "ms", mode: .high)
@@ -208,8 +209,6 @@ struct OverviewView: View {
                         thresholdText(row.label, band: row.band, unit: "Mbps", mode: .low)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             } else {
                 Text("Thresholds unavailable.")
                     .font(.caption)
@@ -252,7 +251,7 @@ struct OverviewView: View {
             subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForGatewayPing(sample),
             systemImage: "network",
-            sparkline: sparklineValues(base: sample.rttAvgMs)
+            sparkline: gatewayRTTSparkline(fallbackBase: sample.rttAvgMs)
         )
     }
 
@@ -270,7 +269,7 @@ struct OverviewView: View {
             subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForExternalPing(sample),
             systemImage: "globe",
-            sparkline: sparklineValues(base: sample.rttAvgMs)
+            sparkline: externalRTTSparkline(fallbackBase: sample.rttAvgMs)
         )
     }
 
@@ -286,10 +285,10 @@ struct OverviewView: View {
             title: "Packet Loss",
             value: formatMetricValue(maxLoss),
             unit: "%",
-            subtitle: "Max across ping probes",
+            subtitle: nil,
             severity: evaluator.severityForPacketLossSummary(samples),
             systemImage: "point.3.connected.trianglepath.dotted",
-            sparkline: sparklineValues(base: maxLoss)
+            sparkline: packetLossSparkline(fallbackBase: maxLoss)
         )
     }
 
@@ -308,7 +307,7 @@ struct OverviewView: View {
             subtitle: okCount == total ? nil : "\(total - okCount) failing",
             severity: evaluator.severityForServiceSummary(latest.http),
             systemImage: "server.rack",
-            sparkline: sparklineValues(base: Double(okCount))
+            sparkline: serviceSparkline(fallbackBase: Double(okCount))
         )
     }
 
@@ -326,8 +325,72 @@ struct OverviewView: View {
             subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForDownload(sample),
             systemImage: "arrow.down.circle",
-            sparkline: sparklineValues(base: sample.mbps)
+            sparkline: downloadSparkline(fallbackBase: sample.mbps)
         )
+    }
+
+    private func gatewayRTTSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedPingSeries(overviewChart?.ping ?? []).first(where: { $0.name.caseInsensitiveCompare("gateway") == .orderedSame }) {
+            let values = series.points.compactMap(\.avgMs)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
+    }
+
+    private func externalRTTSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedPingSeries(overviewChart?.ping ?? []).first(where: { $0.name.caseInsensitiveCompare("gateway") != .orderedSame }) {
+            let values = series.points.compactMap(\.avgMs)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
+    }
+
+    private func packetLossSparkline(fallbackBase: Double?) -> [Double] {
+        var maxLossByTimestamp: [Date: Double] = [:]
+
+        for series in overviewChart?.ping ?? [] {
+            for point in series.points {
+                guard let lossPercent = point.lossPercent else {
+                    continue
+                }
+
+                maxLossByTimestamp[point.ts] = max(maxLossByTimestamp[point.ts] ?? lossPercent, lossPercent)
+            }
+        }
+
+        let values = maxLossByTimestamp
+            .sorted { $0.key < $1.key }
+            .map(\.value)
+
+        return values.isEmpty ? fallbackSparklineValues(base: fallbackBase) : values
+    }
+
+    private func serviceSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedServiceSeries(overviewChart?.serviceGroups ?? []).first {
+            let values = series.points.compactMap(\.okRate)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
+    }
+
+    private func downloadSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedDownloadSeries(overviewChart?.download ?? []).first {
+            let values = series.points.compactMap(\.avgMbps)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
     }
 
     private func sortedPingSamples(_ samples: [PingSample]) -> [PingSample] {
@@ -339,6 +402,24 @@ struct OverviewView: View {
     private func sortedDownloadSamples(_ samples: [DownloadSample]) -> [DownloadSample] {
         samples.sorted { lhs, rhs in
             (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedPingSeries(_ series: [PingChartSeries]) -> [PingChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedDownloadSeries(_ series: [DownloadChartSeries]) -> [DownloadChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedServiceSeries(_ series: [ServiceChartSeries]) -> [ServiceChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.group) < (rhs.displayOrder ?? Int.max, rhs.group)
         }
     }
 
@@ -356,9 +437,13 @@ struct OverviewView: View {
         return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
-    private func sparklineValues(base: Double?) -> [Double] {
-        guard let base, base > 0 else {
+    private func fallbackSparklineValues(base: Double?) -> [Double] {
+        guard let base else {
             return []
+        }
+
+        if base == 0 {
+            return Array(repeating: 0, count: 8)
         }
 
         return [0.72, 0.66, 0.78, 0.62, 0.85, 0.70, 0.92, 0.76].map { base * $0 }
@@ -375,31 +460,40 @@ struct OverviewView: View {
     private func overviewRow(label: String, value: String) -> some View {
         GridRow {
             Text(label)
+                .foregroundStyle(Color.white.opacity(0.68))
                 .frame(width: 72, alignment: .leading)
             Text(value)
+                .foregroundStyle(Color.white.opacity(0.78))
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
     }
 
     private func thresholdText(_ label: String, band: ThresholdBand?, unit: String, mode: ThresholdMode) -> some View {
-        HStack(spacing: 8) {
+        GridRow {
             Text(label)
-                .frame(width: 104, alignment: .leading)
-            Text(formatThresholdBand(band, unit: unit, mode: mode))
+                .font(.caption)
+                .foregroundStyle(Color.white.opacity(0.72))
+                .frame(width: 96, alignment: .leading)
+
+            thresholdValue("warn", value: band?.warning, unit: unit, mode: mode, color: .warning)
+            thresholdValue("crit", value: band?.critical, unit: unit, mode: mode, color: .critical)
+        }
+    }
+
+    private func thresholdValue(_ label: String, value: Double?, unit: String, mode: ThresholdMode, color: MonitoringLevel) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color.dashboardAccentColor)
+                .frame(width: 5, height: 5)
+
+            Text("\(label) \(thresholdDirection(mode)) \(formatThresholdValue(value, unit: unit))")
+                .font(.caption)
+                .foregroundStyle(Color.white.opacity(0.78))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         }
-    }
-
-    private func formatThresholdBand(_ band: ThresholdBand?, unit: String, mode: ThresholdMode) -> String {
-        guard let band else {
-            return "-"
-        }
-
-        let direction = mode == .high ? ">=" : "<"
-        return "warn \(direction) \(formatThresholdValue(band.warning, unit: unit)) / crit \(direction) \(formatThresholdValue(band.critical, unit: unit))"
     }
 
     private func formatThresholdValue(_ value: Double?, unit: String) -> String {
@@ -408,6 +502,10 @@ struct OverviewView: View {
         }
 
         return "\(value.formatted(.number.precision(.fractionLength(0...1))))\(unit)"
+    }
+
+    private func thresholdDirection(_ mode: ThresholdMode) -> String {
+        mode == .high ? ">=" : "<"
     }
 
     private func downloadThresholdRows(_ thresholds: MonitoringThresholds) -> [DownloadThresholdRow] {
@@ -527,13 +625,13 @@ private struct ActiveIssueRow: View {
                     if isPrimary {
                         Text("Primary")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.white.opacity(0.68))
                     }
                 }
 
                 Text(reason.detailText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.white.opacity(0.68))
             }
         }
     }

@@ -66,5 +66,5 @@ private func tableHeader(_ title: String) -> some View {
     Text(title)
         .font(.caption)
         .fontWeight(.semibold)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.white.opacity(0.72))
 }

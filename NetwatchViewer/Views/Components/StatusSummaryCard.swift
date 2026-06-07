@@ -32,7 +32,7 @@ struct StatusSummaryCard: View {
 
                     Text(heroMessage)
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.white.opacity(0.72))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -205,7 +205,7 @@ struct StatusSummaryCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.white.opacity(0.68))
 
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
@@ -265,16 +265,69 @@ private struct StatusRing: View {
 }
 
 #Preview {
-    StatusSummaryCard(
-        status: PreviewMonitoringStatusFactory.status(
-            level: "ok",
-            alert: false,
-            title: "NET OK",
-            message: "all probes healthy",
-            reasons: []
-        ),
-        updatedAt: Date()
-    )
+    VStack(spacing: 12) {
+        StatusSummaryCard(
+            status: PreviewMonitoringStatusFactory.status(
+                level: "ok",
+                alert: false,
+                title: "NET OK",
+                message: "all probes healthy",
+                reasons: []
+            ),
+            updatedAt: Date()
+        )
+
+        StatusSummaryCard(
+            status: PreviewMonitoringStatusFactory.status(
+                level: "warning",
+                alert: true,
+                title: "NET WARN",
+                message: "download threshold warning",
+                reasons: [
+                    [
+                        "code": "download_mbps_low",
+                        "level": "warning",
+                        "target": "r2_1mb",
+                        "metric": "mbps",
+                        "value": 4.8,
+                        "warning": 5.0
+                    ]
+                ]
+            ),
+            updatedAt: Date()
+        )
+
+        StatusSummaryCard(
+            status: PreviewMonitoringStatusFactory.status(
+                level: "critical",
+                alert: true,
+                title: "NET CRIT",
+                message: "packet loss critical",
+                reasons: [
+                    [
+                        "code": "packet_loss_high",
+                        "level": "critical",
+                        "target": "cloudflare_dns",
+                        "metric": "loss_percent",
+                        "value": 6.0,
+                        "critical": 5.0
+                    ]
+                ]
+            ),
+            updatedAt: Date()
+        )
+
+        StatusSummaryCard(
+            status: PreviewMonitoringStatusFactory.status(
+                level: "unknown",
+                alert: false,
+                title: "NET UNKNOWN",
+                message: "status unavailable",
+                reasons: []
+            ),
+            updatedAt: nil
+        )
+    }
     .padding()
     .background(Color(red: 0.04, green: 0.05, blue: 0.07))
 }
