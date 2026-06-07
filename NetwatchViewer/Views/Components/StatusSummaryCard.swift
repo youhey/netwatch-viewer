@@ -236,13 +236,8 @@ private struct StatusRing: View {
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 1) {
-                if level == .ok {
-                    Text("NET")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                }
-
                 Text(ringLabel)
-                    .font(.system(size: level == .ok ? 22 : 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
             }
             .foregroundStyle(level.dashboardAccentColor)
             .minimumScaleFactor(0.75)
