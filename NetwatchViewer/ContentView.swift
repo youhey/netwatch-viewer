@@ -45,14 +45,22 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding()
         }
+        .background(Color(red: 0.025, green: 0.035, blue: 0.055))
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Netwatch")
-                    .font(.title)
-                    .bold()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("NETWATCH")
+                        .font(.system(.title2, design: .rounded))
+                        .fontWeight(.semibold)
+                        .tracking(1.6)
+
+                    Text("Network monitoring dashboard")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -84,6 +92,15 @@ struct ContentView: View {
                     .foregroundStyle(.red)
             }
         }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(red: 0.055, green: 0.075, blue: 0.105).opacity(0.92))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(red: 0.22, green: 0.42, blue: 0.52).opacity(0.18), lineWidth: 1)
+        )
     }
 
     private var lastUpdatedText: String {

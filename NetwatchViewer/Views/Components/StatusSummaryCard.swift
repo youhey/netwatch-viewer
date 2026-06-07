@@ -10,66 +10,74 @@ import SwiftUI
 struct StatusSummaryCard: View {
     let status: MonitoringStatus
     let updatedAt: Date?
+    let alertState: AlertState?
+
+    init(status: MonitoringStatus, updatedAt: Date?, alertState: AlertState? = nil) {
+        self.status = status
+        self.updatedAt = updatedAt
+        self.alertState = alertState
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        SeverityChip(level: status.level)
+        HStack(alignment: .center, spacing: 18) {
+            StatusRing(level: status.level, alert: status.alert)
 
-                        if status.alert {
-                            Text("ALERT")
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(status.level.dashboardAccentColor)
-                        }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    SeverityChip(level: status.level)
+
+                    if status.alert {
+                        Text("ALERT")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(status.level.dashboardAccentColor)
                     }
+                }
 
+                VStack(alignment: .leading, spacing: 4) {
                     Text(status.title)
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
 
-                    Text(status.shortDetail)
+                    Text(status.message)
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer(minLength: 12)
+                HStack(spacing: 16) {
+                    metadata(label: "Updated", value: updatedText)
+                    metadata(label: "Issues", value: String(status.issueCount))
+                    metadata(label: "Alert", value: status.alert ? "true" : "false")
+                }
 
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("Updated")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                if let statusId = status.statusId {
+                    metadata(label: "Status ID", value: statusId)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
 
-                    Text(updatedText)
-                        .font(.headline)
-                        .monospacedDigit()
-
-                    Text("Issues \(status.issueCount)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if let alertState {
+                    HStack(spacing: 16) {
+                        metadata(label: "Observed", value: alertState.lastObservedLevel?.dashboardLabel ?? "-")
+                        metadata(label: "Ack", value: alertState.acknowledgedStatusId == status.statusId ? "true" : "false")
+                    }
                 }
             }
 
-            if let statusId = status.statusId {
-                Text(statusId)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Spacer(minLength: 0)
         }
-        .padding(18)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.07, green: 0.09, blue: 0.12))
+                .fill(Color(red: 0.05, green: 0.07, blue: 0.10).mix(with: status.level.dashboardAccentColor, by: 0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(status.level.dashboardAccentColor.opacity(0.35), lineWidth: 1)
+                .stroke(status.level.dashboardAccentColor.opacity(0.42), lineWidth: 1)
         )
     }
 
@@ -79,6 +87,58 @@ struct StatusSummaryCard: View {
         }
 
         return updatedAt.formatted(date: .omitted, time: .standard)
+    }
+
+    private func metadata(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+        }
+    }
+}
+
+private struct StatusRing: View {
+    let level: MonitoringLevel
+    let alert: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(level.dashboardAccentColor.opacity(0.16), lineWidth: 12)
+
+            Circle()
+                .trim(from: 0, to: alert ? 0.78 : 0.92)
+                .stroke(
+                    level.dashboardAccentColor,
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            Image(systemName: symbolName)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(level.dashboardAccentColor)
+        }
+        .frame(width: 92, height: 92)
+    }
+
+    private var symbolName: String {
+        switch level {
+        case .ok:
+            return "checkmark"
+        case .warning:
+            return "exclamationmark"
+        case .critical:
+            return "xmark"
+        case .unknown:
+            return "questionmark"
+        }
     }
 }
 

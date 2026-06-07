@@ -38,12 +38,13 @@ struct SectionCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.08, green: 0.10, blue: 0.13))
+                .fill(Color(red: 0.055, green: 0.075, blue: 0.105).opacity(0.96))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color(red: 0.22, green: 0.42, blue: 0.52).opacity(0.18), lineWidth: 1)
         )
+        .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 5)
     }
 }
 

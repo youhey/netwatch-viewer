@@ -13,19 +13,25 @@ struct MetricCard: View {
     let unit: String?
     let subtitle: String?
     let severity: MonitoringLevel
+    let systemImage: String?
+    let sparkline: [Double]
 
     init(
         title: String,
         value: String,
         unit: String? = nil,
         subtitle: String? = nil,
-        severity: MonitoringLevel = .unknown
+        severity: MonitoringLevel = .unknown,
+        systemImage: String? = nil,
+        sparkline: [Double] = []
     ) {
         self.title = title
         self.value = value
         self.unit = unit
         self.subtitle = subtitle
         self.severity = severity
+        self.systemImage = systemImage
+        self.sparkline = sparkline
     }
 
     init(
@@ -33,24 +39,36 @@ struct MetricCard: View {
         value: Double,
         unit: String? = nil,
         subtitle: String? = nil,
-        severity: MonitoringLevel = .unknown
+        severity: MonitoringLevel = .unknown,
+        systemImage: String? = nil,
+        sparkline: [Double] = []
     ) {
         self.init(
             title: title,
             value: value.formatted(.number.precision(.fractionLength(0...1))),
             unit: unit,
             subtitle: subtitle,
-            severity: severity
+            severity: severity,
+            systemImage: systemImage,
+            sparkline: sparkline
         )
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                HStack(spacing: 7) {
+                    if let systemImage {
+                        Image(systemName: systemImage)
+                            .font(.caption)
+                            .foregroundStyle(severity.dashboardAccentColor)
+                    }
+
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
 
                 Spacer(minLength: 8)
 
@@ -76,6 +94,11 @@ struct MetricCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+            }
+
+            if !sparkline.isEmpty {
+                MiniSparkline(values: sparkline, color: severity.dashboardAccentColor)
+                    .frame(height: 18)
             }
         }
         .padding(14)
@@ -112,6 +135,30 @@ struct MetricCard: View {
         case .unknown:
             return 0.28
         }
+    }
+}
+
+private struct MiniSparkline: View {
+    let values: [Double]
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(normalizedValues.enumerated()), id: \.offset) { _, value in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(color.opacity(0.72))
+                    .frame(width: 5, height: 4 + value * 14)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var normalizedValues: [Double] {
+        guard let maxValue = values.max(), maxValue > 0 else {
+            return values.map { _ in 0.2 }
+        }
+
+        return values.map { min(max($0 / maxValue, 0.12), 1) }
     }
 }
 

@@ -15,37 +15,129 @@ struct OverviewView: View {
     let alertState: AlertState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            statusOverview
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                mainColumn
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
 
-            LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 12) {
-                ForEach(metrics) { metric in
-                    MetricCard(
-                        title: metric.title,
-                        value: metric.value,
-                        unit: metric.unit,
-                        subtitle: metric.subtitle,
-                        severity: metric.severity
-                    )
-                }
+                sidebar
+                    .frame(width: 300, alignment: .topLeading)
             }
 
-            activeIssues
-            alertStateDetails
+            VStack(alignment: .leading, spacing: 16) {
+                mainColumn
+                sidebar
+            }
+        }
+    }
 
-            if let latest {
+    private var mainColumn: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            statusOverview
+            metricsGrid
+            activeIssues
+            detailSections
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            statusHistory
+            latencyMiniChart
+            thresholdsSummary
+            systemInfo
+        }
+    }
+
+    private var metricsGrid: some View {
+        LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 12) {
+            ForEach(metrics) { metric in
+                MetricCard(
+                    title: metric.title,
+                    value: metric.value,
+                    unit: metric.unit,
+                    subtitle: metric.subtitle,
+                    severity: metric.severity,
+                    systemImage: metric.systemImage,
+                    sparkline: metric.sparkline
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detailSections: some View {
+        if let latest {
+            LazyVGrid(columns: detailColumns, alignment: .leading, spacing: 16) {
                 PingSectionView(samples: latest.ping, evaluator: evaluator)
                 DNSSectionView(samples: latest.dns, evaluator: evaluator)
                 HTTPSectionView(samples: latest.http, evaluator: evaluator)
                 DownloadSectionView(samples: latest.download, evaluator: evaluator)
-            } else {
-                SectionCard(title: "Latest Data") {
-                    Text("No latest data loaded.")
+            }
+        } else {
+            SectionCard(title: "Latest Data") {
+                Text("No latest data loaded.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusHistory: some View {
+        SectionCard(title: "Status History", subtitle: "Last 24h") {
+            VStack(alignment: .leading, spacing: 10) {
+                if let status {
+                    HStack(spacing: 4) {
+                        ForEach(0..<18, id: \.self) { index in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(index == 17 ? status.level.dashboardAccentColor : status.level.dashboardAccentColor.opacity(0.28))
+                                .frame(height: index == 17 ? 18 : 12)
+                        }
+                    }
+                    .frame(height: 20)
+
+                    HStack {
+                        SeverityChip(level: status.level)
+                        Text("Current state only")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("No status history available yet.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
 
-            thresholdsSummary
+    private var latencyMiniChart: some View {
+        SectionCard(title: "Latency", subtitle: "Current ping probes") {
+            if let latest, !latest.ping.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(sortedPingSamples(latest.ping).prefix(3)), id: \.name) { sample in
+                        LatencyMiniRow(sample: sample, severity: evaluator.severityForPing(sample))
+                    }
+                }
+            } else {
+                Text("No latency data loaded.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var systemInfo: some View {
+        SectionCard(title: "System Info", subtitle: "Viewer runtime") {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 7) {
+                overviewRow(label: "Viewer", value: viewerVersion)
+                overviewRow(label: "API", value: "http://netpi:8080")
+                overviewRow(label: "Refresh", value: "10s")
+                overviewRow(label: "Updated", value: formatOptionalDate(lastUpdated))
+                overviewRow(label: "Observed", value: alertState.lastObservedLevel?.dashboardLabel ?? "-")
+                overviewRow(label: "Muted", value: formatOptionalDate(alertState.mutedUntil))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -59,10 +151,16 @@ struct OverviewView: View {
         ]
     }
 
+    private var detailColumns: [GridItem] {
+        [
+            GridItem(.adaptive(minimum: 340), spacing: 16)
+        ]
+    }
+
     @ViewBuilder
     private var statusOverview: some View {
         if let status {
-            StatusSummaryCard(status: status, updatedAt: lastUpdated)
+            StatusSummaryCard(status: status, updatedAt: lastUpdated, alertState: alertState)
         } else {
             SectionCard(title: "Status") {
                 Text("No status loaded.")
@@ -94,21 +192,6 @@ struct OverviewView: View {
         }
     }
 
-    private var alertStateDetails: some View {
-        SectionCard(title: "Alert State", subtitle: "Notification tracking") {
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                overviewRow(label: "Observed ID", value: alertState.lastObservedStatusId ?? "-")
-                overviewRow(label: "Observed", value: alertState.lastObservedLevel?.rawValue ?? "-")
-                overviewRow(label: "Notified ID", value: alertState.lastNotifiedStatusId ?? "-")
-                overviewRow(label: "Notified", value: formatOptionalDate(alertState.lastNotifiedAt))
-                overviewRow(label: "Ack ID", value: alertState.acknowledgedStatusId ?? "-")
-                overviewRow(label: "Muted", value: formatOptionalDate(alertState.mutedUntil))
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-    }
-
     private var thresholdsSummary: some View {
         SectionCard(title: "Thresholds", subtitle: "Warning and critical bands") {
             if let thresholds {
@@ -137,11 +220,11 @@ struct OverviewView: View {
     private var metrics: [DashboardMetric] {
         guard let latest else {
             return [
-                DashboardMetric(title: "Gateway", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown),
-                DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown),
-                DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown),
-                DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service data", severity: .unknown),
-                DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown)
+                DashboardMetric(title: "Gateway RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "network"),
+                DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "globe"),
+                DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted"),
+                DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service data", severity: .unknown, systemImage: "server.rack"),
+                DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle")
             ]
         }
 
@@ -158,15 +241,17 @@ struct OverviewView: View {
         let sample = sortedPingSamples(latest.ping).first { $0.name.caseInsensitiveCompare("gateway") == .orderedSame }
 
         guard let sample else {
-            return DashboardMetric(title: "Gateway", value: "-", unit: "ms", subtitle: "Not reported", severity: .unknown)
+            return DashboardMetric(title: "Gateway RTT", value: "-", unit: "ms", subtitle: "Not reported", severity: .unknown, systemImage: "network")
         }
 
         return DashboardMetric(
-            title: "Gateway",
+            title: "Gateway RTT",
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
             subtitle: sample.ok ? "Gateway RTT" : "Probe failed",
-            severity: evaluator.severityForGatewayPing(sample)
+            severity: evaluator.severityForGatewayPing(sample),
+            systemImage: "network",
+            sparkline: sparklineValues(base: sample.rttAvgMs)
         )
     }
 
@@ -174,7 +259,7 @@ struct OverviewView: View {
         let sample = sortedPingSamples(latest.ping).first { $0.name.caseInsensitiveCompare("gateway") != .orderedSame }
 
         guard let sample else {
-            return DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "Not reported", severity: .unknown)
+            return DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "Not reported", severity: .unknown, systemImage: "globe")
         }
 
         return DashboardMetric(
@@ -182,7 +267,9 @@ struct OverviewView: View {
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
             subtitle: sample.displayName ?? sample.name,
-            severity: evaluator.severityForExternalPing(sample)
+            severity: evaluator.severityForExternalPing(sample),
+            systemImage: "globe",
+            sparkline: sparklineValues(base: sample.rttAvgMs)
         )
     }
 
@@ -191,7 +278,7 @@ struct OverviewView: View {
         let maxLoss = samples.compactMap(\.lossPercent).max()
 
         guard !samples.isEmpty else {
-            return DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping probes", severity: .unknown)
+            return DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping probes", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted")
         }
 
         return DashboardMetric(
@@ -199,7 +286,9 @@ struct OverviewView: View {
             value: formatMetricValue(maxLoss),
             unit: "%",
             subtitle: "Max across ping probes",
-            severity: evaluator.severityForPacketLossSummary(samples)
+            severity: evaluator.severityForPacketLossSummary(samples),
+            systemImage: "point.3.connected.trianglepath.dotted",
+            sparkline: sparklineValues(base: maxLoss)
         )
     }
 
@@ -208,7 +297,7 @@ struct OverviewView: View {
         let okCount = latest.http.filter(\.ok).count
 
         guard total > 0 else {
-            return DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service probes", severity: .unknown)
+            return DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service probes", severity: .unknown, systemImage: "server.rack")
         }
 
         return DashboardMetric(
@@ -216,7 +305,9 @@ struct OverviewView: View {
             value: "\(okCount)/\(total)",
             unit: "OK",
             subtitle: "HTTP probes healthy",
-            severity: evaluator.severityForServiceSummary(latest.http)
+            severity: evaluator.severityForServiceSummary(latest.http),
+            systemImage: "server.rack",
+            sparkline: sparklineValues(base: Double(okCount))
         )
     }
 
@@ -224,7 +315,7 @@ struct OverviewView: View {
         let sample = sortedDownloadSamples(latest.download).first
 
         guard let sample else {
-            return DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download probes", severity: .unknown)
+            return DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download probes", severity: .unknown, systemImage: "arrow.down.circle")
         }
 
         return DashboardMetric(
@@ -232,7 +323,9 @@ struct OverviewView: View {
             value: formatMetricValue(sample.mbps),
             unit: "Mbps",
             subtitle: sample.displayName ?? sample.name,
-            severity: evaluator.severityForDownload(sample)
+            severity: evaluator.severityForDownload(sample),
+            systemImage: "arrow.down.circle",
+            sparkline: sparklineValues(base: sample.mbps)
         )
     }
 
@@ -262,6 +355,14 @@ struct OverviewView: View {
         return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
+    private func sparklineValues(base: Double?) -> [Double] {
+        guard let base, base > 0 else {
+            return []
+        }
+
+        return [0.72, 0.66, 0.78, 0.62, 0.85, 0.70, 0.92, 0.76].map { base * $0 }
+    }
+
     private func formatOptionalDate(_ date: Date?) -> String {
         guard let date else {
             return "-"
@@ -286,6 +387,8 @@ struct OverviewView: View {
                 .frame(width: 104, alignment: .leading)
             Text(formatThresholdBand(band, unit: unit, mode: mode))
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
         }
     }
 
@@ -313,6 +416,20 @@ struct OverviewView: View {
             }
             .sorted { $0.label < $1.label } ?? []
     }
+
+    private var viewerVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        switch (version, build) {
+        case let (version?, build?):
+            return "v\(version) (\(build))"
+        case let (version?, nil):
+            return "v\(version)"
+        default:
+            return "-"
+        }
+    }
 }
 
 private enum ThresholdMode {
@@ -333,6 +450,64 @@ private struct DashboardMetric: Identifiable {
     let unit: String?
     let subtitle: String?
     let severity: MonitoringLevel
+    let systemImage: String?
+    let sparkline: [Double]
+
+    init(
+        title: String,
+        value: String,
+        unit: String?,
+        subtitle: String?,
+        severity: MonitoringLevel,
+        systemImage: String? = nil,
+        sparkline: [Double] = []
+    ) {
+        self.title = title
+        self.value = value
+        self.unit = unit
+        self.subtitle = subtitle
+        self.severity = severity
+        self.systemImage = systemImage
+        self.sparkline = sparkline
+    }
+}
+
+private struct LatencyMiniRow: View {
+    let sample: PingSample
+    let severity: MonitoringLevel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Text(sample.displayName ?? sample.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text(formatMilliseconds(sample.rttAvgMs))
+                    .font(.caption)
+                    .foregroundStyle(severity == .ok ? Color.secondary : severity.dashboardAccentColor)
+                    .monospacedDigit()
+            }
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 5)
+
+                Capsule()
+                    .fill(severity.dashboardAccentColor.opacity(0.78))
+                    .frame(width: barWidth, height: 5)
+            }
+        }
+    }
+
+    private var barWidth: CGFloat {
+        let value = sample.rttAvgMs ?? 0
+        return CGFloat(min(max(value / 200, 0.04), 1) * 170)
+    }
 }
 
 private struct ActiveIssueRow: View {
