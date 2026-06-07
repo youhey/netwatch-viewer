@@ -11,12 +11,14 @@ struct SectionCard<Content: View>: View {
     let title: String
     let subtitle: String?
     let systemImage: String?
+    let fillsVertically: Bool
     @ViewBuilder let content: Content
 
-    init(title: String, subtitle: String? = nil, systemImage: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil, fillsVertically: Bool = true, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
         self.systemImage = systemImage
+        self.fillsVertically = fillsVertically
         self.content = content()
     }
 
@@ -27,7 +29,7 @@ struct SectionCard<Content: View>: View {
             content
         }
         .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: fillsVertically ? .infinity : nil, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.055, green: 0.075, blue: 0.105).opacity(0.96))

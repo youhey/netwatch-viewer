@@ -38,10 +38,12 @@ struct OverviewView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             statusHistory
-            activeIssues
             thresholdsSummary
+            activeIssues
+                .frame(maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(width: 300, alignment: .topLeading)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var metricsGrid: some View {
@@ -88,7 +90,7 @@ struct OverviewView: View {
     }
 
     private var statusHistory: some View {
-        SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath") {
+        SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath", fillsVertically: false) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 4) {
                     ForEach(statusHistoryBuckets) { bucket in
@@ -156,29 +158,33 @@ struct OverviewView: View {
 
     private var activeIssues: some View {
         SectionCard(title: "Active Issues", subtitle: "Current monitoring reasons", systemImage: "shield.lefthalf.filled") {
-            if let status {
-                if status.reasons.isEmpty {
-                    HStack(spacing: 8) {
-                        SeverityChip(level: .ok)
-                        Text("No active issues")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let status {
+                        if status.reasons.isEmpty {
+                            HStack(spacing: 8) {
+                                SeverityChip(level: .ok)
+                                Text("No active issues")
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ForEach(sortedReasons(status.reasons)) { reason in
+                                ActiveIssueRow(reason: reason, isPrimary: reason == status.primaryReason)
+                            }
+                        }
+                    } else {
+                        Text("No status loaded.")
                             .foregroundStyle(.secondary)
                     }
-                } else {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(sortedReasons(status.reasons)) { reason in
-                            ActiveIssueRow(reason: reason, isPrimary: reason == status.primaryReason)
-                        }
-                    }
                 }
-            } else {
-                Text("No status loaded.")
-                    .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .frame(maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
     private var thresholdsSummary: some View {
-        SectionCard(title: "Thresholds", subtitle: "Warning and critical bands", systemImage: "slider.horizontal.3") {
+        SectionCard(title: "Thresholds", subtitle: "Warning and critical bands", systemImage: "slider.horizontal.3", fillsVertically: false) {
             if let thresholds {
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                     thresholdText("Gateway RTT", band: thresholds.ping?.gatewayRttAvgMs, unit: "ms", mode: .high)
