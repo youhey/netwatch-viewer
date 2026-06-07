@@ -18,16 +18,26 @@ struct DNSSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "DNS", subtitle: "Resolver latency") {
+        SectionCard(title: "DNS", subtitle: "Resolver latency", systemImage: "globe") {
             if samples.isEmpty {
                 Text("No DNS samples.")
                     .foregroundStyle(.secondary)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 9) {
+                    GridRow {
+                        tableHeader("Status")
+                        tableHeader("Name")
+                        tableHeader("Duration")
+                    }
+
+                    Divider()
+                        .gridCellColumns(3)
+
                     ForEach(sortedSamples, id: \DNSSample.name) { sample in
                         DNSRowView(sample: sample, severity: evaluator.severityForDNS(sample))
                     }
                 }
+                .font(.system(.callout, design: .monospaced))
             }
         }
     }
@@ -40,12 +50,8 @@ private struct DNSRowView: View {
     var body: some View {
         GridRow {
             SeverityChip(level: severity)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(sample.displayName ?? sample.name)
-                    .fontWeight(.medium)
-                Text(sample.hostname ?? "-")
-                    .foregroundStyle(.secondary)
-            }
+            Text(sample.displayName ?? sample.name)
+                .fontWeight(.medium)
             Text(formatMilliseconds(sample.durationMs))
                 .foregroundStyle(valueColor)
         }
@@ -54,4 +60,11 @@ private struct DNSRowView: View {
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
     }
+}
+
+private func tableHeader(_ title: String) -> some View {
+    Text(title)
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
 }

@@ -10,32 +10,43 @@ import SwiftUI
 struct SectionCard<Content: View>: View {
     let title: String
     let subtitle: String?
+    let systemImage: String?
     @ViewBuilder let content: Content
 
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
+        self.systemImage = systemImage
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+            HStack(alignment: .top, spacing: 9) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Self.metricAccent)
+                        .frame(width: 20, alignment: .leading)
+                }
 
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
             content
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color(red: 0.055, green: 0.075, blue: 0.105).opacity(0.96))
@@ -45,6 +56,10 @@ struct SectionCard<Content: View>: View {
                 .stroke(Color(red: 0.22, green: 0.42, blue: 0.52).opacity(0.18), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 5)
+    }
+
+    private static var metricAccent: Color {
+        Color(red: 0.28, green: 0.78, blue: 0.96)
     }
 }
 

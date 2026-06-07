@@ -55,38 +55,43 @@ struct MetricCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                HStack(spacing: 7) {
-                    if let systemImage {
-                        Image(systemName: systemImage)
-                            .font(.caption)
-                            .foregroundStyle(severity.dashboardAccentColor)
-                    }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Self.metricAccent)
+                        .frame(width: 28, height: 28)
+                }
 
-                    Text(title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                Text(title)
+                    .font(.system(.callout, design: .rounded))
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(value)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+                        .foregroundStyle(valueColor)
+                        .monospacedDigit()
+                        .lineLimit(1)
+
+                    if let unit {
+                        Text(unit)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Spacer(minLength: 8)
 
                 SeverityChip(level: severity)
-            }
-
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(value)
-                    .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    .foregroundStyle(valueColor)
-                    .monospacedDigit()
-                    .lineLimit(1)
-
-                if let unit {
-                    Text(unit)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             if let subtitle {
@@ -97,12 +102,12 @@ struct MetricCard: View {
             }
 
             if !sparkline.isEmpty {
-                MiniSparkline(values: sparkline, color: severity.dashboardAccentColor)
-                    .frame(height: 18)
+                MiniSparkline(values: sparkline, color: Self.metricAccent)
+                    .frame(height: 26)
             }
         }
-        .padding(14)
-        .frame(minWidth: 150, maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .frame(minWidth: 175, maxWidth: .infinity, minHeight: 150, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(backgroundColor)
@@ -115,6 +120,10 @@ struct MetricCard: View {
 
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
+    }
+
+    private static var metricAccent: Color {
+        Color(red: 0.27, green: 0.78, blue: 0.96)
     }
 
     private var backgroundColor: Color {
@@ -143,14 +152,32 @@ private struct MiniSparkline: View {
     let color: Color
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 3) {
-            ForEach(Array(normalizedValues.enumerated()), id: \.offset) { _, value in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(color.opacity(0.72))
-                    .frame(width: 5, height: 4 + value * 14)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottomLeading) {
+                Path { path in
+                    let width = proxy.size.width
+                    let height = proxy.size.height
+                    let step = normalizedValues.count > 1 ? width / CGFloat(normalizedValues.count - 1) : width
+
+                    for index in normalizedValues.indices {
+                        let x = CGFloat(index) * step
+                        let y = height - CGFloat(normalizedValues[index]) * height
+
+                        if index == 0 {
+                            path.move(to: CGPoint(x: x, y: y))
+                        } else {
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+                .stroke(color.opacity(0.86), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+
+                Rectangle()
+                    .fill(color.opacity(0.18))
+                    .frame(height: 1)
+                    .offset(y: -2)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var normalizedValues: [Double] {

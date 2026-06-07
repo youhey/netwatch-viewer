@@ -18,17 +18,27 @@ struct DownloadSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "Download", subtitle: "Latest throughput probes") {
+        SectionCard(title: "Download", subtitle: "Latest throughput probes", systemImage: "arrow.down.circle") {
             if samples.isEmpty {
                 Text("No download samples.")
                     .foregroundStyle(.secondary)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 9) {
+                    GridRow {
+                        tableHeader("Status")
+                        tableHeader("Target")
+                        tableHeader("Speed")
+                        tableHeader("Duration")
+                    }
+
+                    Divider()
+                        .gridCellColumns(4)
+
                     ForEach(sortedSamples, id: \DownloadSample.name) { sample in
                         DownloadRowView(sample: sample, severity: evaluator.severityForDownload(sample))
                     }
                 }
-                .font(.system(.body, design: .monospaced))
+                .font(.system(.callout, design: .monospaced))
             }
         }
     }
@@ -47,10 +57,6 @@ private struct DownloadRowView: View {
                 .foregroundStyle(valueColor)
             Text(formatMilliseconds(sample.durationMs))
                 .foregroundStyle(valueColor)
-            Text("\(formatBytes(sample.downloadedBytes)) / \(formatBytes(sample.expectedBytes))")
-                .foregroundStyle(.secondary)
-            Text(sample.ts.formatted(date: .omitted, time: .standard))
-                .foregroundStyle(.secondary)
         }
 
         if let error = sample.error, !error.isEmpty {
@@ -58,7 +64,7 @@ private struct DownloadRowView: View {
                 Text("")
                 Text(error)
                     .foregroundStyle(.red)
-                    .gridCellColumns(5)
+                    .gridCellColumns(3)
             }
         }
     }
@@ -66,4 +72,11 @@ private struct DownloadRowView: View {
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
     }
+}
+
+private func tableHeader(_ title: String) -> some View {
+    Text(title)
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
 }

@@ -18,17 +18,30 @@ struct HTTPSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "Services", subtitle: "HTTP probe status and latency") {
+        SectionCard(title: "Service", subtitle: "HTTP probe status and latency", systemImage: "server.rack") {
             if samples.isEmpty {
                 Text("No HTTP samples.")
                     .foregroundStyle(.secondary)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 9) {
+                    GridRow {
+                        tableHeader("Status")
+                        tableHeader("Service")
+                        tableHeader("Group")
+                        tableHeader("Category")
+                        tableHeader("HTTP Status")
+                        tableHeader("Total")
+                        tableHeader("TTFB")
+                    }
+
+                    Divider()
+                        .gridCellColumns(7)
+
                     ForEach(sortedSamples, id: \HTTPSample.name) { sample in
                         HTTPRowView(sample: sample, severity: evaluator.severityForHTTP(sample))
                     }
                 }
-                .font(.system(.body, design: .monospaced))
+                .font(.system(.callout, design: .monospaced))
             }
         }
     }
@@ -51,12 +64,19 @@ private struct HTTPRowView: View {
                 .foregroundStyle(sample.ok ? Color.secondary : Color.red)
             Text(formatMilliseconds(sample.totalMs))
                 .foregroundStyle(valueColor)
-            Text("ttfb \(formatMilliseconds(sample.ttfbMs))")
-                .foregroundStyle(.secondary)
+            Text(formatMilliseconds(sample.ttfbMs))
+                .foregroundStyle(valueColor)
         }
     }
 
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
     }
+}
+
+private func tableHeader(_ title: String) -> some View {
+    Text(title)
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
 }

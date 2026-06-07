@@ -56,13 +56,19 @@ struct ContentView: View {
                         .font(.system(.title2, design: .rounded))
                         .fontWeight(.semibold)
                         .tracking(1.6)
-
-                    Text("Network monitoring dashboard")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(appAccentColor)
                 }
 
                 Spacer()
+
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading...")
+                        .foregroundStyle(.secondary)
+                }
+                .opacity(viewModel.isLoading ? 1 : 0)
+                .frame(width: 104, alignment: .trailing)
 
                 Button {
                     Task {
@@ -72,19 +78,6 @@ struct ContentView: View {
                     Label("Reload", systemImage: "arrow.clockwise")
                 }
                 .disabled(viewModel.isLoading)
-            }
-
-            HStack(spacing: 12) {
-                statusRow(label: "Updated", value: lastUpdatedText)
-
-                if viewModel.isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading...")
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
 
             if let errorMessage = viewModel.errorMessage {
@@ -103,21 +96,8 @@ struct ContentView: View {
         )
     }
 
-    private var lastUpdatedText: String {
-        guard let lastUpdated = viewModel.lastUpdated else {
-            return "Never"
-        }
-
-        return lastUpdated.formatted(date: .omitted, time: .standard)
-    }
-
-    private func statusRow(label: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .leading)
-            Text(value)
-        }
+    private var appAccentColor: Color {
+        Color(red: 0.27, green: 0.78, blue: 0.96)
     }
 }
 

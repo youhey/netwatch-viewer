@@ -64,7 +64,7 @@ struct OverviewView: View {
     private var detailSections: some View {
         if let latest {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 16) {
+                LazyVGrid(columns: detailCardColumns, alignment: .leading, spacing: 16) {
                     PingSectionView(samples: latest.ping, evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
 
@@ -151,9 +151,11 @@ struct OverviewView: View {
     }
 
     private var metricColumns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: 155), spacing: 12)
-        ]
+        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 12), count: 5)
+    }
+
+    private var detailCardColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16), count: 3)
     }
 
     @ViewBuilder
@@ -222,7 +224,7 @@ struct OverviewView: View {
                 DashboardMetric(title: "Gateway RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "network"),
                 DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "globe"),
                 DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted"),
-                DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service data", severity: .unknown, systemImage: "server.rack"),
+                DashboardMetric(title: "Services", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack"),
                 DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle")
             ]
         }
@@ -247,7 +249,7 @@ struct OverviewView: View {
             title: "Gateway RTT",
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
-            subtitle: sample.ok ? "Gateway RTT" : "Probe failed",
+            subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForGatewayPing(sample),
             systemImage: "network",
             sparkline: sparklineValues(base: sample.rttAvgMs)
@@ -265,7 +267,7 @@ struct OverviewView: View {
             title: "External RTT",
             value: formatMetricValue(sample.rttAvgMs),
             unit: "ms",
-            subtitle: sample.displayName ?? sample.name,
+            subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForExternalPing(sample),
             systemImage: "globe",
             sparkline: sparklineValues(base: sample.rttAvgMs)
@@ -296,14 +298,14 @@ struct OverviewView: View {
         let okCount = latest.http.filter(\.ok).count
 
         guard total > 0 else {
-            return DashboardMetric(title: "Services", value: "-", unit: "OK", subtitle: "No service probes", severity: .unknown, systemImage: "server.rack")
+            return DashboardMetric(title: "Services", value: "-", unit: nil, subtitle: "No service probes", severity: .unknown, systemImage: "server.rack")
         }
 
         return DashboardMetric(
             title: "Services",
             value: "\(okCount)/\(total)",
-            unit: "OK",
-            subtitle: "HTTP probes healthy",
+            unit: nil,
+            subtitle: okCount == total ? nil : "\(total - okCount) failing",
             severity: evaluator.severityForServiceSummary(latest.http),
             systemImage: "server.rack",
             sparkline: sparklineValues(base: Double(okCount))
@@ -321,7 +323,7 @@ struct OverviewView: View {
             title: "Download",
             value: formatMetricValue(sample.mbps),
             unit: "Mbps",
-            subtitle: sample.displayName ?? sample.name,
+            subtitle: sample.ok ? nil : "Probe failed",
             severity: evaluator.severityForDownload(sample),
             systemImage: "arrow.down.circle",
             sparkline: sparklineValues(base: sample.mbps)

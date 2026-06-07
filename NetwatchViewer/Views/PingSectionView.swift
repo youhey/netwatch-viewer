@@ -18,17 +18,27 @@ struct PingSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "Ping", subtitle: "Latest RTT and packet loss") {
+        SectionCard(title: "Ping", subtitle: "Latest RTT and packet loss", systemImage: "network") {
             if samples.isEmpty {
                 Text("No ping samples.")
                     .foregroundStyle(.secondary)
             } else {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 9) {
+                    GridRow {
+                        tableHeader("Status")
+                        tableHeader("Target")
+                        tableHeader("RTT Avg")
+                        tableHeader("Loss")
+                    }
+
+                    Divider()
+                        .gridCellColumns(4)
+
                     ForEach(sortedSamples, id: \PingSample.name) { sample in
                         PingRowView(sample: sample, severity: evaluator.severityForPing(sample))
                     }
                 }
-                .font(.system(.body, design: .monospaced))
+                .font(.system(.callout, design: .monospaced))
             }
         }
     }
@@ -43,20 +53,21 @@ private struct PingRowView: View {
             SeverityChip(level: severity)
             Text(sample.displayName ?? sample.name)
                 .fontWeight(.medium)
-            Text(sample.target ?? "-")
-                .foregroundStyle(.secondary)
             Text(formatMilliseconds(sample.rttAvgMs))
                 .foregroundStyle(valueColor)
-            Text("loss \(formatPercent(sample.lossPercent))")
+            Text(formatPercent(sample.lossPercent))
                 .foregroundStyle(valueColor)
-            Text("min \(formatMilliseconds(sample.rttMinMs))")
-                .foregroundStyle(.secondary)
-            Text("max \(formatMilliseconds(sample.rttMaxMs))")
-                .foregroundStyle(.secondary)
         }
     }
 
     private var valueColor: Color {
         severity == .ok ? .primary : severity.dashboardAccentColor
     }
+}
+
+private func tableHeader(_ title: String) -> some View {
+    Text(title)
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
 }

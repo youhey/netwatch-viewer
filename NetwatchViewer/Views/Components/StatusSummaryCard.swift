@@ -19,51 +19,30 @@ struct StatusSummaryCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 18) {
+        HStack(alignment: .center, spacing: 34) {
             StatusRing(level: status.level, alert: status.alert)
 
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    SeverityChip(level: status.level)
-
-                    if status.alert {
-                        Text("ALERT")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(status.level.dashboardAccentColor)
-                    }
-                }
-
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(status.title)
-                        .font(.system(size: 34, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.primary)
+                    Text(heroTitle)
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                        .foregroundStyle(status.level.dashboardAccentColor)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
 
-                    Text(status.message)
-                        .font(.body)
+                    Text(heroMessage)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                HStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 22) {
                     metadata(label: "Updated", value: updatedText)
+                    metadata(label: "Status", value: statusLabel)
                     metadata(label: "Issues", value: String(status.issueCount))
                     metadata(label: "Alert", value: status.alert ? "true" : "false")
-                }
-
-                if let statusId = status.statusId {
-                    metadata(label: "Status ID", value: statusId)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if let alertState {
-                    HStack(spacing: 16) {
-                        metadata(label: "Observed", value: alertState.lastObservedLevel?.dashboardLabel ?? "-")
-                        metadata(label: "Ack", value: alertState.acknowledgedStatusId == status.statusId ? "true" : "false")
-                    }
+                    metadata(label: "Ack", value: acknowledgedText)
                 }
             }
 
@@ -86,21 +65,156 @@ struct StatusSummaryCard: View {
             return "Never"
         }
 
-        return updatedAt.formatted(date: .omitted, time: .standard)
+        return updatedAt.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
+    }
+
+    private var statusLabel: String {
+        if let statusId = status.statusId, !statusId.isEmpty {
+            return statusId
+        }
+
+        return status.level.rawValue
+    }
+
+    private var heroTitle: String {
+        switch status.level {
+        case .ok:
+            return "All systems operational"
+        case .warning:
+            return "Network degradation detected"
+        case .critical:
+            return "Critical network issue detected"
+        case .unknown:
+            return "Monitoring status unavailable"
+        }
+    }
+
+    private var heroMessage: String {
+        switch status.level {
+        case .ok:
+            return "All probes are healthy. Network performance is normal."
+        case .warning:
+            return reasonMessage(
+                thresholdLabel: "warning",
+                fallback: "One or more probes are outside normal thresholds. Check active issues for details."
+            )
+        case .critical:
+            return reasonMessage(
+                thresholdLabel: "critical",
+                fallback: "One or more critical probes are failing or outside critical thresholds. Immediate attention may be needed."
+            )
+        case .unknown:
+            if status.reasons.isEmpty {
+                return "No recent monitoring status is available."
+            }
+
+            return "Netwatch cannot determine current network health. Check API connectivity and probe freshness."
+        }
+    }
+
+    private var acknowledgedText: String {
+        guard let alertState else {
+            return "-"
+        }
+
+        return alertState.acknowledgedStatusId == status.statusId ? "true" : "false"
+    }
+
+    private func reasonMessage(thresholdLabel: String, fallback: String) -> String {
+        guard let reason = status.primaryReason ?? status.reasons.first else {
+            return fallback
+        }
+
+        return "\(reasonLead(for: reason, thresholdLabel: thresholdLabel)) \(issueCountText)"
+    }
+
+    private func reasonLead(for reason: MonitoringReason, thresholdLabel: String) -> String {
+        let subject = reasonSubject(for: reason)
+        let comparison = reasonComparison(for: reason, thresholdLabel: thresholdLabel)
+
+        guard let target = reason.target, !target.isEmpty else {
+            return "\(subject) \(comparison)."
+        }
+
+        return "\(subject) \(comparison) on \(formattedTargetName(target))."
+    }
+
+    private func reasonSubject(for reason: MonitoringReason) -> String {
+        switch reason.metric {
+        case "mbps":
+            return "Download throughput"
+        case "loss_percent":
+            return "Packet loss"
+        case "rtt_avg_ms":
+            return "Latency"
+        case "duration_ms":
+            return "DNS duration"
+        case "total_ms", "ttfb_ms":
+            return "Service latency"
+        default:
+            return "Probe health"
+        }
+    }
+
+    private func reasonComparison(for reason: MonitoringReason, thresholdLabel: String) -> String {
+        switch reason.metric {
+        case "mbps":
+            return "is below the \(thresholdLabel) threshold"
+        case "loss_percent", "rtt_avg_ms", "duration_ms", "total_ms", "ttfb_ms":
+            return "is above the \(thresholdLabel) threshold"
+        default:
+            return "is outside the \(thresholdLabel) threshold"
+        }
+    }
+
+    private var issueCountText: String {
+        let count = max(status.issueCount, 1)
+        let noun = count == 1 ? "issue" : "issues"
+        return "\(count) active \(noun) detected."
+    }
+
+    private func formattedTargetName(_ value: String) -> String {
+        value.split(separator: "_")
+            .map { formattedTargetPart($0) }
+            .joined(separator: " ")
+    }
+
+    private func formattedTargetPart(_ part: Substring) -> String {
+        let lower = part.lowercased()
+
+        switch lower {
+        case "dns":
+            return "DNS"
+        case "http":
+            return "HTTP"
+        case "r2":
+            return "R2"
+        default:
+            if lower.hasSuffix("mb") {
+                let number = lower.dropLast(2)
+                if !number.isEmpty, number.allSatisfy(\.isNumber) {
+                    return "\(number)MB"
+                }
+            }
+
+            return lower.prefix(1).uppercased() + String(lower.dropFirst())
+        }
     }
 
     private func metadata(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption2)
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.caption)
-                .fontWeight(.medium)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .monospacedDigit()
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
+        .frame(minWidth: 68, maxWidth: 132, alignment: .leading)
     }
 }
 
@@ -117,27 +231,35 @@ private struct StatusRing: View {
                 .trim(from: 0, to: alert ? 0.78 : 0.92)
                 .stroke(
                     level.dashboardAccentColor,
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 13, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
-            Image(systemName: symbolName)
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(level.dashboardAccentColor)
+            VStack(spacing: 1) {
+                if level == .ok {
+                    Text("NET")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+
+                Text(ringLabel)
+                    .font(.system(size: level == .ok ? 22 : 24, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(level.dashboardAccentColor)
+            .minimumScaleFactor(0.75)
         }
-        .frame(width: 92, height: 92)
+        .frame(width: 112, height: 112)
     }
 
-    private var symbolName: String {
+    private var ringLabel: String {
         switch level {
         case .ok:
-            return "checkmark"
+            return "OK"
         case .warning:
-            return "exclamationmark"
+            return "WARN"
         case .critical:
-            return "xmark"
+            return "CRIT"
         case .unknown:
-            return "questionmark"
+            return "UNK"
         }
     }
 }
