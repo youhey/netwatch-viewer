@@ -298,8 +298,8 @@ struct OverviewView: View {
                 DashboardMetric(title: "Gateway RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "network"),
                 DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "globe"),
                 DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted"),
-                DashboardMetric(title: "Services", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack"),
-                DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle")
+                DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle"),
+                DashboardMetric(title: "Service Health", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack")
             ]
         }
 
@@ -307,8 +307,8 @@ struct OverviewView: View {
             gatewayMetric(latest),
             externalRTTMetric(latest),
             packetLossMetric(latest),
-            servicesMetric(latest),
-            downloadMetric(latest)
+            downloadMetric(latest),
+            servicesMetric(latest)
         ]
     }
 
@@ -372,11 +372,11 @@ struct OverviewView: View {
         let okCount = latest.http.filter(\.ok).count
 
         guard total > 0 else {
-            return DashboardMetric(title: "Services", value: "-", unit: nil, subtitle: "No service probes", severity: .unknown, systemImage: "server.rack")
+            return DashboardMetric(title: "Service Health", value: "-", unit: nil, subtitle: "No service probes", severity: .unknown, systemImage: "server.rack")
         }
 
         return DashboardMetric(
-            title: "Services",
+            title: "Service Health",
             value: "\(okCount)/\(total)",
             unit: nil,
             subtitle: okCount == total ? nil : "\(total - okCount) failing",
