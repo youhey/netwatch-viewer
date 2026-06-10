@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
     @StateObject private var chartsViewModel = ChartsViewModel()
+    @State private var showsErrorDetails = false
 
     var body: some View {
         TabView {
@@ -27,13 +28,52 @@ struct ContentView: View {
         .task {
             viewModel.startAutoRefresh()
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 10) {
+                    Text("NETWATCH")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .tracking(1.2)
+                        .foregroundStyle(appAccentColor)
+
+                    apiStatusButton
+                }
+                .padding(.horizontal, 8)
+            }
+
+            ToolbarItem(placement: .principal) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 10) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Text("Auto Refresh 10s")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button {
+                        Task {
+                            await viewModel.reload()
+                        }
+                    } label: {
+                        Label("Reload", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+                .padding(.horizontal, 6)
+            }
+        }
     }
 
     private var overviewTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                header
-
                 OverviewView(
                     status: viewModel.monitoringStatus,
                     latest: viewModel.latest,
@@ -53,54 +93,27 @@ struct ContentView: View {
         .background(Color(red: 0.025, green: 0.035, blue: 0.055))
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("NETWATCH")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .tracking(1.6)
-                        .foregroundStyle(appAccentColor)
-
-                    Text("Network monitoring dashboard")
-                        .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.58))
-                }
-
-                Spacer()
-
-                HStack(spacing: 12) {
-                    HStack(spacing: 7) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Loading...")
-                            .foregroundStyle(.secondary)
-                    }
-                    .opacity(viewModel.isLoading ? 1 : 0)
-                    .frame(width: 100, alignment: .trailing)
-
-                    Text("Auto Refresh 10s")
-                        .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.62))
-
-                    Button {
-                        Task {
-                            await viewModel.reload()
-                        }
-                    } label: {
-                        Label("Reload", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(viewModel.isLoading)
-                }
+    private var apiStatusButton: some View {
+        Image(systemName: viewModel.errorMessage == nil ? "checkmark.circle.fill" : "xmark.circle.fill")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(viewModel.errorMessage == nil ? Color.green : Color.red)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                showsErrorDetails = viewModel.errorMessage != nil
             }
-
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+        .help(apiStatusHelpText)
+        .popover(isPresented: $showsErrorDetails, arrowEdge: .bottom) {
+            Text(viewModel.errorMessage ?? "Status and latest API requests are healthy.")
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(12)
+                .frame(width: 280, alignment: .leading)
         }
-        .padding(.top, 2)
+    }
+
+    private var apiStatusHelpText: String {
+        viewModel.errorMessage ?? "Status and latest API requests are healthy."
     }
 
     private var appAccentColor: Color {
