@@ -116,14 +116,25 @@ struct NetwatchClient {
         )
     }
 
+    func fetchAIAnalysisExport(range: AIAnalysisExportRange) async throws -> AIAnalysisExport {
+        let (data, response) = try await fetchData(
+            path: "/api/export/ai",
+            queryItems: [
+                URLQueryItem(name: "range", value: range.rawValue)
+            ]
+        )
+
+        let suggestedFilename = suggestedFilename(from: response.value(forHTTPHeaderField: "Content-Disposition")) ?? range.defaultFilename
+        return AIAnalysisExport(data: data, suggestedFilename: suggestedFilename)
+    }
+
     private func fetch<T: Decodable>(path: String, queryItems: [URLQueryItem] = []) async throws -> T {
-        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)
-        components?.queryItems = queryItems.isEmpty ? nil : queryItems
+        let (data, _) = try await fetchData(path: path, queryItems: queryItems)
+        return try makeJSONDecoder().decode(T.self, from: data)
+    }
 
-        guard let url = components?.url else {
-            throw NetwatchClientError.invalidURL
-        }
-
+    private func fetchData(path: String, queryItems: [URLQueryItem] = []) async throws -> (Data, HTTPURLResponse) {
+        let url = try makeURL(path: path, queryItems: queryItems)
         let (data, response) = try await urlSession.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -137,10 +148,22 @@ struct NetwatchClient {
                 throw NetwatchClientError.apiError(statusCode: httpResponse.statusCode, detail: apiError.error)
             }
 
-            throw NetwatchClientError.httpStatus(httpResponse.statusCode)
+            let detail = String(data: data, encoding: .utf8)
+            throw NetwatchClientError.httpStatus(statusCode: httpResponse.statusCode, detail: detail)
         }
 
-        return try makeJSONDecoder().decode(T.self, from: data)
+        return (data, httpResponse)
+    }
+
+    private func makeURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
+        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
+
+        guard let url = components?.url else {
+            throw NetwatchClientError.invalidURL
+        }
+
+        return url
     }
 
     private func makeJSONDecoder() -> JSONDecoder {
@@ -148,12 +171,70 @@ struct NetwatchClient {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }
+
+    private func suggestedFilename(from contentDisposition: String?) -> String? {
+        guard let contentDisposition else {
+            return nil
+        }
+
+        for component in contentDisposition.split(separator: ";") {
+            let trimmed = component.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lowercased = trimmed.lowercased()
+
+            if lowercased.hasPrefix("filename*="),
+               let value = trimmed.split(separator: "=", maxSplits: 1).last {
+                let encoded = String(value).replacingOccurrences(of: "UTF-8''", with: "", options: [.caseInsensitive])
+                return encoded.removingPercentEncoding
+            }
+
+            if lowercased.hasPrefix("filename="),
+               let value = trimmed.split(separator: "=", maxSplits: 1).last {
+                return String(value).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+
+        return nil
+    }
+}
+
+struct AIAnalysisExport {
+    let data: Data
+    let suggestedFilename: String
+}
+
+enum AIAnalysisExportRange: String, CaseIterable, Identifiable {
+    case oneDay = "1d"
+    case sevenDays = "7d"
+    case thirtyDays = "30d"
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .oneDay:
+            "Last 1 day"
+        case .sevenDays:
+            "Last 7 days"
+        case .thirtyDays:
+            "Last 30 days"
+        }
+    }
+
+    var defaultFilename: String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "netwatch-export-\(formatter.string(from: Date())).zip"
+    }
 }
 
 enum NetwatchClientError: LocalizedError {
     case invalidURL
     case invalidResponse
-    case httpStatus(Int)
+    case httpStatus(statusCode: Int, detail: String? = nil)
     case apiError(statusCode: Int, detail: APIErrorDetail)
 
     var errorDescription: String? {
@@ -162,8 +243,12 @@ enum NetwatchClientError: LocalizedError {
             "API URL を組み立てられませんでした。"
         case .invalidResponse:
             "API のレスポンス形式が不正です。"
-        case .httpStatus(let statusCode):
-            "API が HTTP \(statusCode) を返しました。"
+        case .httpStatus(let statusCode, let detail):
+            if let detail, !detail.isEmpty {
+                "API が HTTP \(statusCode) を返しました: \(detail)"
+            } else {
+                "API が HTTP \(statusCode) を返しました。"
+            }
         case .apiError(_, let detail):
             detail.message
         }

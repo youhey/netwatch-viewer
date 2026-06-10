@@ -5,12 +5,15 @@
 //  Created by 池田洋平 on 2026/06/06.
 //
 
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
     @StateObject private var chartsViewModel = ChartsViewModel()
     @State private var showsErrorDetails = false
+    @State private var exportAlert: ExportAlert?
 
     var body: some View {
         TabView {
@@ -48,6 +51,19 @@ struct ContentView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 10) {
+                    Menu {
+                        ForEach(AIAnalysisExportRange.allCases) { range in
+                            Button(range.title) {
+                                Task {
+                                    await exportAIAnalysis(range: range)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(viewModel.isExporting ? "Exporting..." : "Export", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(viewModel.isExporting)
+
                     Text("Auto Refresh 10s")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -64,6 +80,13 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 6)
             }
+        }
+        .alert(item: $exportAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
 
@@ -120,6 +143,44 @@ struct ContentView: View {
     private var appAccentColor: Color {
         Color(red: 0.27, green: 0.78, blue: 0.96)
     }
+
+    private func exportAIAnalysis(range: AIAnalysisExportRange) async {
+        guard let export = await viewModel.downloadAIAnalysisExport(range: range) else {
+            exportAlert = ExportAlert(
+                title: "Export failed",
+                message: viewModel.exportErrorMessage ?? "Could not create AI analysis export."
+            )
+            return
+        }
+
+        guard let saveURL = chooseExportSaveURL(suggestedFilename: export.suggestedFilename) else {
+            viewModel.cancelAIAnalysisExportSave()
+            return
+        }
+
+        viewModel.saveAIAnalysisExport(export, to: saveURL)
+
+        if let errorMessage = viewModel.exportErrorMessage {
+            exportAlert = ExportAlert(title: "Export failed", message: errorMessage)
+        } else {
+            exportAlert = ExportAlert(
+                title: "Export completed",
+                message: viewModel.exportMessage ?? "AI analysis export was saved."
+            )
+        }
+    }
+
+    private func chooseExportSaveURL(suggestedFilename: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "Save AI Analysis Export"
+        panel.message = "Choose where to save the netwatch AI analysis ZIP export."
+        panel.nameFieldStringValue = suggestedFilename
+        panel.allowedContentTypes = [.zip]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+
+        return panel.runModal() == .OK ? panel.url : nil
+    }
 }
 
 private struct ReloadIcon: View {
@@ -133,6 +194,12 @@ private struct ReloadIcon: View {
                 value: isLoading
             )
     }
+}
+
+private struct ExportAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }
 
 #Preview {

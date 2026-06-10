@@ -33,6 +33,9 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var statusHistoryError: String?
     @Published private(set) var statusHistorySource: StatusHistorySource
     @Published private(set) var statusHistoryBuckets: [StatusHistoryBucket]
+    @Published private(set) var isExporting = false
+    @Published private(set) var exportMessage: String?
+    @Published private(set) var exportErrorMessage: String?
 
     private let client: NetwatchClient
     private let notificationManager: NotificationManager
@@ -108,6 +111,41 @@ final class DashboardViewModel: ObservableObject {
         await refresh()
         await refreshOverviewChart()
         await refreshMonitoringStatusHistory()
+    }
+
+    func downloadAIAnalysisExport(range: AIAnalysisExportRange) async -> AIAnalysisExport? {
+        guard !isExporting else {
+            return nil
+        }
+
+        isExporting = true
+        exportMessage = nil
+        exportErrorMessage = nil
+
+        do {
+            return try await client.fetchAIAnalysisExport(range: range)
+        } catch {
+            isExporting = false
+            exportErrorMessage = "Export failed: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    func saveAIAnalysisExport(_ export: AIAnalysisExport, to url: URL) {
+        do {
+            try export.data.write(to: url, options: .atomic)
+            exportMessage = "Export completed: \(url.lastPathComponent)"
+            exportErrorMessage = nil
+        } catch {
+            exportMessage = nil
+            exportErrorMessage = "Export failed: \(error.localizedDescription)"
+        }
+
+        isExporting = false
+    }
+
+    func cancelAIAnalysisExportSave() {
+        isExporting = false
     }
 
     func refresh() async {
