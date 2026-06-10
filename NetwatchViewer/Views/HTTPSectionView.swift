@@ -16,7 +16,7 @@ struct HTTPSectionView: View {
     }
 
     var body: some View {
-        SectionCard(title: "Service Health", subtitle: "Grouped HTTP probe health", systemImage: "server.rack", fillsVertically: false) {
+        SectionCard(title: "Service Health", subtitle: "Grouped HTTP probe health", systemImage: "server.rack") {
             if samples.isEmpty {
                 Text("No HTTP samples.")
                     .foregroundStyle(.secondary)

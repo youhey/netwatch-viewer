@@ -10,6 +10,8 @@ import SwiftUI
 struct OverviewView: View {
     let status: MonitoringStatus?
     let latest: LatestResponse?
+    let providerStatus: ProviderStatusSummary?
+    let providerStatusError: String?
     let thresholds: MonitoringThresholds?
     let overviewChart: ChartsOverviewResponse?
     let statusHistory: MonitoringStatusHistoryResponse?
@@ -67,8 +69,8 @@ struct OverviewView: View {
 
     @ViewBuilder
     private var detailSections: some View {
-        if let latest {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
+            if let latest {
                 LazyVGrid(columns: detailCardColumns, alignment: .leading, spacing: 16) {
                     PingSectionView(samples: latest.ping, evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
@@ -79,19 +81,30 @@ struct OverviewView: View {
                     DownloadSectionView(samples: latest.download, evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                 }
-
-                LazyVGrid(columns: summaryCardColumns, alignment: .leading, spacing: 16) {
-                    HTTPSectionView(samples: latest.http, evaluator: evaluator)
-                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+            } else {
+                SectionCard(title: "Latest Data", systemImage: "tray.full") {
+                    Text("No latest data loaded.")
+                        .foregroundStyle(.secondary)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        } else {
-            SectionCard(title: "Latest Data", systemImage: "tray.full") {
-                Text("No latest data loaded.")
-                    .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: summaryCardColumns, alignment: .leading, spacing: 16) {
+                if let latest {
+                    HTTPSectionView(samples: latest.http, evaluator: evaluator)
+                        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    SectionCard(title: "Service Health", subtitle: "Grouped HTTP probe health", systemImage: "server.rack") {
+                        Text("No HTTP samples loaded.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+
+                ProviderStatusSummaryCard(summary: providerStatus, errorMessage: providerStatusError)
+                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var statusHistorySection: some View {
@@ -221,21 +234,33 @@ struct OverviewView: View {
         SectionCard(title: "Active Issues", subtitle: "Current monitoring reasons", systemImage: "shield.lefthalf.filled") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    let providerIssues = providerStatus?.issueProviders ?? []
+
                     if let status {
-                        if status.reasons.isEmpty {
+                        let monitoringReasons = visibleMonitoringReasons(status.reasons, providerIssues: providerIssues)
+
+                        if monitoringReasons.isEmpty && providerIssues.isEmpty {
                             HStack(spacing: 8) {
                                 SeverityChip(level: .ok)
                                 Text("No active issues")
                                     .foregroundStyle(.secondary)
                             }
                         } else {
-                            ForEach(sortedReasons(status.reasons)) { reason in
+                            ForEach(monitoringReasons) { reason in
                                 ActiveIssueRow(reason: reason, isPrimary: reason == status.primaryReason)
                             }
+
+                            ForEach(providerIssues) { provider in
+                                ActiveProviderIssueRow(provider: provider)
+                            }
                         }
-                    } else {
+                    } else if providerIssues.isEmpty {
                         Text("No status loaded.")
                             .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(providerIssues) { provider in
+                            ActiveProviderIssueRow(provider: provider)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -479,6 +504,11 @@ struct OverviewView: View {
         }
     }
 
+    private func visibleMonitoringReasons(_ reasons: [MonitoringReason], providerIssues: [ProviderStatusItem]) -> [MonitoringReason] {
+        let filteredReasons = providerIssues.isEmpty ? reasons : reasons.filter { $0.code != "provider_status" }
+        return sortedReasons(filteredReasons)
+    }
+
     private func formatMetricValue(_ value: Double?) -> String {
         guard let value else {
             return "-"
@@ -617,6 +647,44 @@ private struct ActiveIssueRow: View {
                     .foregroundStyle(Color.white.opacity(0.68))
             }
         }
+    }
+}
+
+private struct ActiveProviderIssueRow: View {
+    let provider: ProviderStatusItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SeverityChip(level: provider.level)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(provider.displayLabel)
+                        .fontWeight(.semibold)
+
+                    Text("Provider")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                }
+
+                Text(issueDetailText)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var issueDetailText: String {
+        if let error = provider.error, !error.isEmpty {
+            return error
+        }
+
+        if let description = provider.description, !description.isEmpty {
+            return description
+        }
+
+        return "Provider status page reports \(provider.level.dashboardLabel.lowercased())."
     }
 }
 

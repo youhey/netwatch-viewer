@@ -19,8 +19,16 @@ struct NetwatchClient {
         try await fetch(path: "/api/monitoring/status")
     }
 
+    func fetchMonitoringCompact() async throws -> MonitoringCompactResponse {
+        try await fetch(path: "/api/monitoring/compact")
+    }
+
     func fetchLatest() async throws -> LatestResponse {
         try await fetch(path: "/api/latest")
+    }
+
+    func fetchStatusPagesLatest() async throws -> StatusPagesLatestResponse {
+        try await fetch(path: "/api/status-pages/latest")
     }
 
     func fetchCapabilities() async throws -> APICapabilities {

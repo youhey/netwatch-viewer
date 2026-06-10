@@ -12,6 +12,8 @@ import Foundation
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var monitoringStatus: MonitoringStatus?
     @Published private(set) var latest: LatestResponse?
+    @Published private(set) var providerStatus: ProviderStatusSummary?
+    @Published private(set) var providerStatusError: String?
     @Published private(set) var thresholds: MonitoringThresholds?
     @Published private(set) var overviewChart: ChartsOverviewResponse?
     @Published private(set) var overviewChartLastUpdated: Date?
@@ -139,6 +141,8 @@ final class DashboardViewModel: ObservableObject {
             errors.append("Latest: \(error.localizedDescription)")
         }
 
+        await refreshProviderStatus()
+
         do {
             thresholds = try await client.fetchMonitoringThresholds()
         } catch {
@@ -183,6 +187,35 @@ final class DashboardViewModel: ObservableObject {
             if statusHistory == nil {
                 syncObservedStatusHistoryFallback()
             }
+        }
+    }
+
+    private func refreshProviderStatus() async {
+        do {
+            providerStatus = try await fetchProviderStatusSummary()
+            providerStatusError = nil
+        } catch {
+            providerStatusError = "Provider status: \(error.localizedDescription)"
+        }
+    }
+
+    private func fetchProviderStatusSummary() async throws -> ProviderStatusSummary {
+        var compactError: Error?
+
+        do {
+            let compact = try await client.fetchMonitoringCompact()
+
+            if let providerStatus = compact.providerStatus {
+                return providerStatus
+            }
+        } catch {
+            compactError = error
+        }
+
+        do {
+            return try await client.fetchStatusPagesLatest().providerStatusSummary
+        } catch {
+            throw compactError ?? error
         }
     }
 

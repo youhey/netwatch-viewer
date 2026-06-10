@@ -73,6 +73,8 @@ struct ContentView: View {
                 OverviewView(
                     status: viewModel.monitoringStatus,
                     latest: viewModel.latest,
+                    providerStatus: viewModel.providerStatus,
+                    providerStatusError: viewModel.providerStatusError,
                     thresholds: viewModel.thresholds,
                     overviewChart: viewModel.overviewChart,
                     statusHistory: viewModel.statusHistory,
