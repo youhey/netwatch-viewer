@@ -37,13 +37,7 @@ struct ChartsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Charts")
-                    .font(.title)
-                    .bold()
-
-                Spacer()
-
+            HStack(spacing: 10) {
                 Picker("Range", selection: rangeBinding) {
                     ForEach(viewModel.supportedRanges) { range in
                         Text(range.title).tag(range)
@@ -69,11 +63,6 @@ struct ChartsView: View {
                     Label("Reload", systemImage: "arrow.clockwise")
                 }
                 .disabled(viewModel.isLoading)
-            }
-
-            HStack(spacing: 12) {
-                Text("Updated: \(lastUpdatedText)")
-                    .foregroundStyle(.secondary)
 
                 if viewModel.isLoading || viewModel.isLoadingSupport {
                     HStack(spacing: 8) {
@@ -83,9 +72,9 @@ struct ChartsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
 
-            metadata
+                Spacer()
+            }
 
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
@@ -107,50 +96,6 @@ struct ChartsView: View {
             get: { viewModel.bucket },
             set: { viewModel.setBucket($0) }
         )
-    }
-
-    private var metadata: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Range: \(viewModel.metadata?.range ?? viewModel.range.rawValue) / Bucket: \(viewModel.metadata?.bucket ?? viewModel.bucket.rawValue) / Points: max \(viewModel.metadata?.maxPoints ?? viewModel.maxPoints)")
-
-            if let bucketSeconds = viewModel.metadata?.bucketSeconds {
-                Text("Bucket seconds: \(bucketSeconds)")
-            }
-
-            if let actualRangeStart = viewModel.metadata?.actualRangeStart, let actualRangeEnd = viewModel.metadata?.actualRangeEnd {
-                Text("Actual: \(formatDateTime(actualRangeStart)) - \(formatDateTime(actualRangeEnd))")
-            }
-
-            HStack(spacing: 12) {
-                if let generatedAt = viewModel.metadata?.generatedAt {
-                    Text("Generated: \(formatTime(generatedAt))")
-                }
-
-                Text("Timezone: \(viewModel.metadata?.timezone ?? viewModel.catalog?.timezone ?? "-")")
-            }
-
-            if let generatedAt = viewModel.capabilities?.generatedAt {
-                Text("Capabilities: \(formatTime(generatedAt))")
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    private var lastUpdatedText: String {
-        guard let lastUpdated = viewModel.lastUpdated else {
-            return "Never"
-        }
-
-        return lastUpdated.formatted(date: .omitted, time: .standard)
-    }
-
-    private func formatTime(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .standard)
-    }
-
-    private func formatDateTime(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .shortened)
     }
 
     private func resetChartSelections() {

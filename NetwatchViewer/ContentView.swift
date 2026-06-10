@@ -43,7 +43,7 @@ struct ContentView: View {
 
                     apiStatusButton
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 14)
             }
 
             ToolbarItem(placement: .primaryAction) {
