@@ -80,8 +80,10 @@ struct OverviewView: View {
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                 }
 
-                HTTPSectionView(samples: latest.http, evaluator: evaluator)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                LazyVGrid(columns: summaryCardColumns, alignment: .leading, spacing: 16) {
+                    HTTPSectionView(samples: latest.http, evaluator: evaluator)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
@@ -160,6 +162,10 @@ struct OverviewView: View {
 
     private var detailCardColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16), count: 3)
+    }
+
+    private var summaryCardColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 420), spacing: 16)]
     }
 
     private var statusLegendColumns: [GridItem] {

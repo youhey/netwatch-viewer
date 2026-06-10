@@ -84,4 +84,6 @@ struct HTTPSample: Codable, Identifiable {
     let contentLength: Int?
     let contentLengthRead: Int?
     let bodyTruncated: Bool?
+    let error: String?
+    let errorMessage: String?
 }
