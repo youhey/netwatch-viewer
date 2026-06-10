@@ -334,7 +334,7 @@ struct OverviewView: View {
                 DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "globe"),
                 DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted"),
                 DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle"),
-                DashboardMetric(title: "Service Health", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack")
+                compactServiceMetric() ?? DashboardMetric(title: "Service Health", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack")
             ]
         }
 
@@ -403,6 +403,10 @@ struct OverviewView: View {
     }
 
     private func servicesMetric(_ latest: LatestResponse) -> DashboardMetric {
+        if let metric = compactServiceMetric() {
+            return metric
+        }
+
         let total = latest.http.count
         let okCount = latest.http.filter(\.ok).count
 
@@ -416,6 +420,35 @@ struct OverviewView: View {
             unit: nil,
             subtitle: okCount == total ? nil : "\(total - okCount) failing",
             severity: evaluator.severityForServiceSummary(latest.http),
+            systemImage: "server.rack",
+            sparkline: serviceSparkline(fallbackBase: Double(okCount))
+        )
+    }
+
+    private func compactServiceMetric() -> DashboardMetric? {
+        guard let serviceHealth else {
+            return nil
+        }
+
+        let okCount = serviceHealth.summary.reduce(0) { partialResult, group in
+            partialResult + (group.ok ?? 0)
+        }
+        let total = serviceHealth.summary.reduce(0) { partialResult, group in
+            partialResult + (group.total ?? 0)
+        }
+
+        guard total > 0 else {
+            return nil
+        }
+
+        let severity = serviceHealth.level ?? worstLevel(serviceHealth.summary.map(\.level))
+
+        return DashboardMetric(
+            title: "Service Health",
+            value: "\(okCount)/\(total)",
+            unit: nil,
+            subtitle: nil,
+            severity: severity,
             systemImage: "server.rack",
             sparkline: serviceSparkline(fallbackBase: Double(okCount))
         )
@@ -537,6 +570,12 @@ struct OverviewView: View {
         reasons.sorted { lhs, rhs in
             (lhs.level.sortPriority, lhs.code, lhs.target ?? "", lhs.metric ?? "") < (rhs.level.sortPriority, rhs.code, rhs.target ?? "", rhs.metric ?? "")
         }
+    }
+
+    private func worstLevel(_ levels: [MonitoringLevel]) -> MonitoringLevel {
+        levels.min { lhs, rhs in
+            lhs.sortPriority < rhs.sortPriority
+        } ?? .unknown
     }
 
     private func visibleMonitoringReasons(_ reasons: [MonitoringReason], providerIssues: [ProviderStatusItem], serviceIssues: [CompactServiceHealthIssue]) -> [MonitoringReason] {
