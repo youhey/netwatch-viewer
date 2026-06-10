@@ -10,6 +10,7 @@ import Foundation
 struct NetwatchClient {
     private let baseURL = URL(string: "http://netpi:8080")!
     private let urlSession: URLSession
+    private static let exportTimeoutInterval: TimeInterval = 30 * 60
 
     init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
@@ -121,7 +122,8 @@ struct NetwatchClient {
             path: "/api/export/ai",
             queryItems: [
                 URLQueryItem(name: "range", value: range.rawValue)
-            ]
+            ],
+            timeoutInterval: Self.exportTimeoutInterval
         )
 
         let suggestedFilename = suggestedFilename(from: response.value(forHTTPHeaderField: "Content-Disposition")) ?? range.defaultFilename
@@ -133,9 +135,18 @@ struct NetwatchClient {
         return try makeJSONDecoder().decode(T.self, from: data)
     }
 
-    private func fetchData(path: String, queryItems: [URLQueryItem] = []) async throws -> (Data, HTTPURLResponse) {
+    private func fetchData(path: String, queryItems: [URLQueryItem] = [], timeoutInterval: TimeInterval? = nil) async throws -> (Data, HTTPURLResponse) {
         let url = try makeURL(path: path, queryItems: queryItems)
-        let (data, response) = try await urlSession.data(from: url)
+        let data: Data
+        let response: URLResponse
+
+        if let timeoutInterval {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = timeoutInterval
+            (data, response) = try await urlSession.data(for: request)
+        } else {
+            (data, response) = try await urlSession.data(from: url)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetwatchClientError.invalidResponse

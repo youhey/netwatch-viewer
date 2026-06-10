@@ -14,6 +14,7 @@ struct ContentView: View {
     @StateObject private var chartsViewModel = ChartsViewModel()
     @State private var showsErrorDetails = false
     @State private var exportAlert: ExportAlert?
+    @State private var isExportProgressPresented = false
 
     var body: some View {
         TabView {
@@ -50,24 +51,25 @@ struct ContentView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 10) {
-                    Menu {
-                        ForEach(AIAnalysisExportRange.allCases) { range in
-                            Button(range.title) {
-                                Task {
-                                    await exportAIAnalysis(range: range)
-                                }
+                Menu {
+                    ForEach(AIAnalysisExportRange.allCases) { range in
+                        Button(range.title) {
+                            Task {
+                                await exportAIAnalysis(range: range)
                             }
                         }
-                    } label: {
-                        Label(viewModel.isExporting ? "Exporting..." : "Export", systemImage: "square.and.arrow.down")
                     }
-                    .disabled(viewModel.isExporting)
+                } label: {
+                    Label(viewModel.isExporting ? "Exporting..." : "Export", systemImage: "square.and.arrow.down")
+                }
+                .disabled(viewModel.isExporting)
+            }
 
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 10) {
                     Text("Auto Refresh 10s")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .padding(.leading, 18)
 
                     Button {
                         Task {
@@ -87,6 +89,10 @@ struct ContentView: View {
                 message: Text(alert.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .sheet(isPresented: $isExportProgressPresented) {
+            ExportProgressView()
+                .interactiveDismissDisabled(true)
         }
     }
 
@@ -145,13 +151,19 @@ struct ContentView: View {
     }
 
     private func exportAIAnalysis(range: AIAnalysisExportRange) async {
+        isExportProgressPresented = true
+
         guard let export = await viewModel.downloadAIAnalysisExport(range: range) else {
+            isExportProgressPresented = false
             exportAlert = ExportAlert(
                 title: "Export failed",
                 message: viewModel.exportErrorMessage ?? "Could not create AI analysis export."
             )
             return
         }
+
+        isExportProgressPresented = false
+        await Task.yield()
 
         guard let saveURL = chooseExportSaveURL(suggestedFilename: export.suggestedFilename) else {
             viewModel.cancelAIAnalysisExportSave()
@@ -200,6 +212,24 @@ private struct ExportAlert: Identifiable {
     let id = UUID()
     let title: String
     let message: String
+}
+
+private struct ExportProgressView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+
+            Text("Exporting...")
+                .font(.headline)
+
+            Text("Downloading AI analysis ZIP export.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(28)
+        .frame(width: 320, height: 160)
+    }
 }
 
 #Preview {
