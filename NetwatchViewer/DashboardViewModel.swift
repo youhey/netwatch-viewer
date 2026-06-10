@@ -148,6 +148,18 @@ final class DashboardViewModel: ObservableObject {
         isExporting = false
     }
 
+    func completeAIAnalysisExportSave(filename: String) {
+        exportMessage = "Export completed: \(filename)"
+        exportErrorMessage = nil
+        isExporting = false
+    }
+
+    func failAIAnalysisExportSave(_ error: Error) {
+        exportMessage = nil
+        exportErrorMessage = "Export failed: \(error.localizedDescription)"
+        isExporting = false
+    }
+
     func refresh() async {
         if isLoading {
             return

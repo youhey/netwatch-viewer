@@ -101,6 +101,7 @@ private struct ServiceHealthSummary {
 
         groups = groupedSamples.map { displayName, groupSamples in
             ServiceGroupSummary(
+                id: displayName,
                 displayName: displayName,
                 okCount: groupSamples.filter { $0.level == .ok }.count,
                 totalCount: groupSamples.count,
@@ -122,10 +123,12 @@ private struct ServiceHealthSummary {
 
     init(serviceHealth: CompactServiceHealth) {
         groups = serviceHealth.summary
-            .map { group in
+            .enumerated()
+            .map { index, group in
                 let displayName = group.label ?? ServiceProbeDisplay.groupName(group: group.group, category: nil)
 
                 return ServiceGroupSummary(
+                    id: "\(group.group)-\(index)",
                     displayName: displayName,
                     okCount: group.ok ?? 0,
                     totalCount: group.total ?? 0,
@@ -166,8 +169,7 @@ private struct ServiceSample {
 }
 
 private struct ServiceGroupSummary: Identifiable {
-    var id: String { displayName }
-
+    let id: String
     let displayName: String
     let okCount: Int
     let totalCount: Int
