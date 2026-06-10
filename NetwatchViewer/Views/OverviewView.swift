@@ -10,6 +10,9 @@ import SwiftUI
 struct OverviewView: View {
     let status: MonitoringStatus?
     let latest: LatestResponse?
+    let compactNetworkStatus: CompactNetworkStatus?
+    let compactGeneratedAt: Date?
+    let serviceHealth: CompactServiceHealth?
     let providerStatus: ProviderStatusSummary?
     let providerStatusError: String?
     let thresholds: MonitoringThresholds?
@@ -88,16 +91,13 @@ struct OverviewView: View {
                 }
             }
 
-            LazyVGrid(columns: summaryCardColumns, alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 if let latest {
-                    HTTPSectionView(samples: latest.http, evaluator: evaluator)
+                    HTTPSectionView(samples: latest.http, evaluator: evaluator, serviceHealth: serviceHealth)
                         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else {
-                    SectionCard(title: "Service Health", subtitle: "Grouped HTTP probe health", systemImage: "server.rack") {
-                        Text("No HTTP samples loaded.")
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    HTTPSectionView(samples: [], evaluator: evaluator, serviceHealth: serviceHealth)
+                        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
 
                 ProviderStatusSummaryCard(summary: providerStatus, errorMessage: providerStatusError)
@@ -177,10 +177,6 @@ struct OverviewView: View {
         Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16), count: 3)
     }
 
-    private var summaryCardColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 420), spacing: 16)]
-    }
-
     private var statusLegendColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 2)
     }
@@ -220,8 +216,15 @@ struct OverviewView: View {
 
     @ViewBuilder
     private var statusOverview: some View {
-        if let status {
-            StatusSummaryCard(status: status, updatedAt: lastUpdated, alertState: alertState)
+        if let displayStatus {
+            StatusSummaryCard(
+                status: displayStatus,
+                updatedAt: displayStatus.generatedAt ?? lastUpdated,
+                alertState: alertState,
+                titleOverride: compactNetworkStatus?.title,
+                messageOverride: compactNetworkStatus?.message,
+                issueCountOverride: compactNetworkStatus?.issueCount
+            )
         } else {
             SectionCard(title: "Status", systemImage: "shield.lefthalf.filled") {
                 Text("No status loaded.")
@@ -234,30 +237,38 @@ struct OverviewView: View {
         SectionCard(title: "Active Issues", subtitle: "Current monitoring reasons", systemImage: "shield.lefthalf.filled") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    let networkReasons = activeNetworkReasons
+                    let serviceIssues = serviceHealth?.issues.filter(\.isIssue) ?? []
                     let providerIssues = providerStatus?.issueProviders ?? []
 
-                    if let status {
-                        let monitoringReasons = visibleMonitoringReasons(status.reasons, providerIssues: providerIssues)
-
-                        if monitoringReasons.isEmpty && providerIssues.isEmpty {
+                    if displayStatus != nil {
+                        if networkReasons.isEmpty && serviceIssues.isEmpty && providerIssues.isEmpty {
                             HStack(spacing: 8) {
                                 SeverityChip(level: .ok)
                                 Text("No active issues")
                                     .foregroundStyle(.secondary)
                             }
                         } else {
-                            ForEach(monitoringReasons) { reason in
-                                ActiveIssueRow(reason: reason, isPrimary: reason == status.primaryReason)
+                            ForEach(networkReasons) { reason in
+                                ActiveIssueRow(reason: reason, isPrimary: reason == displayStatus?.primaryReason)
+                            }
+
+                            ForEach(serviceIssues) { issue in
+                                ActiveServiceIssueRow(issue: issue)
                             }
 
                             ForEach(providerIssues) { provider in
                                 ActiveProviderIssueRow(provider: provider)
                             }
                         }
-                    } else if providerIssues.isEmpty {
+                    } else if serviceIssues.isEmpty && providerIssues.isEmpty {
                         Text("No status loaded.")
                             .foregroundStyle(.secondary)
                     } else {
+                        ForEach(serviceIssues) { issue in
+                            ActiveServiceIssueRow(issue: issue)
+                        }
+
                         ForEach(providerIssues) { provider in
                             ActiveProviderIssueRow(provider: provider)
                         }
@@ -267,6 +278,30 @@ struct OverviewView: View {
             }
             .frame(maxHeight: .infinity, alignment: .topLeading)
         }
+    }
+
+    private var displayStatus: MonitoringStatus? {
+        if let compactNetworkStatus {
+            return compactNetworkStatus.monitoringStatus(source: status?.source, generatedAt: compactGeneratedAt ?? status?.generatedAt)
+        }
+
+        return status
+    }
+
+    private var activeNetworkReasons: [MonitoringReason] {
+        guard let displayStatus else {
+            return []
+        }
+
+        if compactNetworkStatus != nil {
+            return sortedReasons(displayStatus.reasons)
+        }
+
+        return visibleMonitoringReasons(
+            displayStatus.reasons,
+            providerIssues: providerStatus?.issueProviders ?? [],
+            serviceIssues: serviceHealth?.issues.filter(\.isIssue) ?? []
+        )
     }
 
     private var thresholdsSummary: some View {
@@ -504,8 +539,19 @@ struct OverviewView: View {
         }
     }
 
-    private func visibleMonitoringReasons(_ reasons: [MonitoringReason], providerIssues: [ProviderStatusItem]) -> [MonitoringReason] {
-        let filteredReasons = providerIssues.isEmpty ? reasons : reasons.filter { $0.code != "provider_status" }
+    private func visibleMonitoringReasons(_ reasons: [MonitoringReason], providerIssues: [ProviderStatusItem], serviceIssues: [CompactServiceHealthIssue]) -> [MonitoringReason] {
+        let filteredReasons = reasons.filter { reason in
+            if !providerIssues.isEmpty, reason.code == "provider_status" {
+                return false
+            }
+
+            if !serviceIssues.isEmpty, reason.code.hasPrefix("service_") || reason.code.hasPrefix("http_") {
+                return false
+            }
+
+            return true
+        }
+
         return sortedReasons(filteredReasons)
     }
 
@@ -647,6 +693,48 @@ private struct ActiveIssueRow: View {
                     .foregroundStyle(Color.white.opacity(0.68))
             }
         }
+    }
+}
+
+private struct ActiveServiceIssueRow: View {
+    let issue: CompactServiceHealthIssue
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SeverityChip(level: issue.level)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(issue.displayLabel)
+                        .fontWeight(.semibold)
+
+                    Text("Service")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                }
+
+                Text(issueDetailText)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var issueDetailText: String {
+        var parts: [String] = []
+
+        if let reason = issue.reason, !reason.isEmpty {
+            parts.append(reason)
+        } else if let httpStatusCode = issue.httpStatusCode {
+            parts.append("HTTP \(httpStatusCode)")
+        }
+
+        if issue.durationMs != nil {
+            parts.append(formatMilliseconds(issue.durationMs))
+        }
+
+        return parts.isEmpty ? "Service health issue" : parts.joined(separator: "  ")
     }
 }
 

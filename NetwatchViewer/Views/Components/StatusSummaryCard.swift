@@ -11,11 +11,24 @@ struct StatusSummaryCard: View {
     let status: MonitoringStatus
     let updatedAt: Date?
     let alertState: AlertState?
+    let titleOverride: String?
+    let messageOverride: String?
+    let issueCountOverride: Int?
 
-    init(status: MonitoringStatus, updatedAt: Date?, alertState: AlertState? = nil) {
+    init(
+        status: MonitoringStatus,
+        updatedAt: Date?,
+        alertState: AlertState? = nil,
+        titleOverride: String? = nil,
+        messageOverride: String? = nil,
+        issueCountOverride: Int? = nil
+    ) {
         self.status = status
         self.updatedAt = updatedAt
         self.alertState = alertState
+        self.titleOverride = titleOverride
+        self.messageOverride = messageOverride
+        self.issueCountOverride = issueCountOverride
     }
 
     var body: some View {
@@ -40,7 +53,7 @@ struct StatusSummaryCard: View {
                 HStack(alignment: .top, spacing: 22) {
                     metadata(label: "Updated", value: updatedText)
                     metadata(label: "Status", value: statusLabel)
-                    metadata(label: "Issues", value: String(status.issueCount))
+                    metadata(label: "Issues", value: String(displayIssueCount))
                     metadata(label: "Alert", value: status.alert ? "true" : "false")
                     metadata(label: "Ack", value: acknowledgedText)
                 }
@@ -77,6 +90,10 @@ struct StatusSummaryCard: View {
     }
 
     private var heroTitle: String {
+        if let titleOverride, !titleOverride.isEmpty {
+            return titleOverride
+        }
+
         switch status.level {
         case .ok:
             return "All systems operational"
@@ -90,6 +107,10 @@ struct StatusSummaryCard: View {
     }
 
     private var heroMessage: String {
+        if let messageOverride, !messageOverride.isEmpty {
+            return messageOverride
+        }
+
         switch status.level {
         case .ok:
             return "All probes are healthy. Network performance is normal."
@@ -168,9 +189,13 @@ struct StatusSummaryCard: View {
     }
 
     private var issueCountText: String {
-        let count = max(status.issueCount, 1)
+        let count = max(displayIssueCount, 1)
         let noun = count == 1 ? "issue" : "issues"
         return "\(count) active \(noun) detected."
+    }
+
+    private var displayIssueCount: Int {
+        issueCountOverride ?? status.issueCount
     }
 
     private func formattedTargetName(_ value: String) -> String {

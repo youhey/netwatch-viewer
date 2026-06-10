@@ -12,6 +12,9 @@ import Foundation
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var monitoringStatus: MonitoringStatus?
     @Published private(set) var latest: LatestResponse?
+    @Published private(set) var compactNetworkStatus: CompactNetworkStatus?
+    @Published private(set) var compactGeneratedAt: Date?
+    @Published private(set) var serviceHealth: CompactServiceHealth?
     @Published private(set) var providerStatus: ProviderStatusSummary?
     @Published private(set) var providerStatusError: String?
     @Published private(set) var thresholds: MonitoringThresholds?
@@ -141,7 +144,7 @@ final class DashboardViewModel: ObservableObject {
             errors.append("Latest: \(error.localizedDescription)")
         }
 
-        await refreshProviderStatus()
+        await refreshCompactMonitoring()
 
         do {
             thresholds = try await client.fetchMonitoringThresholds()
@@ -190,32 +193,35 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    private func refreshProviderStatus() async {
-        do {
-            providerStatus = try await fetchProviderStatusSummary()
-            providerStatusError = nil
-        } catch {
-            providerStatusError = "Provider status: \(error.localizedDescription)"
-        }
-    }
-
-    private func fetchProviderStatusSummary() async throws -> ProviderStatusSummary {
-        var compactError: Error?
-
+    private func refreshCompactMonitoring() async {
         do {
             let compact = try await client.fetchMonitoringCompact()
+            compactNetworkStatus = compact.resolvedNetworkStatus
+            compactGeneratedAt = compact.generatedAt
+            serviceHealth = compact.serviceHealth
 
             if let providerStatus = compact.providerStatus {
-                return providerStatus
+                self.providerStatus = providerStatus
+                providerStatusError = nil
+                return
             }
         } catch {
-            compactError = error
+            compactNetworkStatus = nil
+            compactGeneratedAt = nil
+            serviceHealth = nil
+            await refreshProviderStatusFallback(compactError: error)
+            return
         }
 
+        await refreshProviderStatusFallback(compactError: nil)
+    }
+
+    private func refreshProviderStatusFallback(compactError: Error?) async {
         do {
-            return try await client.fetchStatusPagesLatest().providerStatusSummary
+            providerStatus = try await client.fetchStatusPagesLatest().providerStatusSummary
+            providerStatusError = nil
         } catch {
-            throw compactError ?? error
+            providerStatusError = "Provider status: \((compactError ?? error).localizedDescription)"
         }
     }
 

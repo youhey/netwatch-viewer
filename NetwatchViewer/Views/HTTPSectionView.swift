@@ -10,21 +10,42 @@ import SwiftUI
 struct HTTPSectionView: View {
     let samples: [HTTPSample]
     let evaluator: SeverityEvaluator
+    let serviceHealth: CompactServiceHealth?
+
+    init(samples: [HTTPSample], evaluator: SeverityEvaluator, serviceHealth: CompactServiceHealth? = nil) {
+        self.samples = samples
+        self.evaluator = evaluator
+        self.serviceHealth = serviceHealth
+    }
 
     private var summary: ServiceHealthSummary {
-        ServiceHealthSummary(samples: samples, evaluator: evaluator)
+        if let serviceHealth {
+            return ServiceHealthSummary(serviceHealth: serviceHealth)
+        }
+
+        return ServiceHealthSummary(samples: samples, evaluator: evaluator)
     }
 
     var body: some View {
         SectionCard(title: "Service Health", subtitle: "Grouped HTTP probe health", systemImage: "server.rack") {
-            if samples.isEmpty {
-                Text("No HTTP samples.")
+            if summary.groups.isEmpty && summary.issues.isEmpty {
+                Text(serviceHealth == nil ? "No HTTP samples." : "No service health data.")
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 14) {
-                    LazyVGrid(columns: groupColumns, alignment: .leading, spacing: 8) {
-                        ForEach(summary.groups) { group in
-                            ServiceGroupSummaryRow(group: group)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(groupRows(for: summary.groups).indices, id: \.self) { rowIndex in
+                            HStack(spacing: 12) {
+                                ForEach(groupRows(for: summary.groups)[rowIndex]) { group in
+                                    ServiceGroupSummaryRow(group: group)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+
+                                if groupRows(for: summary.groups)[rowIndex].count == 1 {
+                                    Color.clear
+                                        .frame(maxWidth: .infinity)
+                                }
+                            }
                         }
                     }
 
@@ -55,8 +76,15 @@ struct HTTPSectionView: View {
         }
     }
 
-    private var groupColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 190), spacing: 12)]
+    private func groupRows(for groups: [ServiceGroupSummary]) -> [[ServiceGroupSummary]] {
+        stride(from: groups.startIndex, to: groups.endIndex, by: 2).map { index in
+            let nextIndex = groups.index(after: index)
+            if nextIndex < groups.endIndex {
+                return [groups[index], groups[nextIndex]]
+            }
+
+            return [groups[index]]
+        }
     }
 }
 
@@ -87,6 +115,31 @@ private struct ServiceHealthSummary {
         issues = enrichedSamples
             .filter { $0.level != .ok }
             .map(ServiceIssue.init(serviceSample:))
+            .sorted { lhs, rhs in
+                (lhs.level.sortPriority, lhs.displayOrder, lhs.label) < (rhs.level.sortPriority, rhs.displayOrder, rhs.label)
+            }
+    }
+
+    init(serviceHealth: CompactServiceHealth) {
+        groups = serviceHealth.summary
+            .map { group in
+                let displayName = group.label ?? ServiceProbeDisplay.groupName(group: group.group, category: nil)
+
+                return ServiceGroupSummary(
+                    displayName: displayName,
+                    okCount: group.ok ?? 0,
+                    totalCount: group.total ?? 0,
+                    level: group.level,
+                    displayOrder: ServiceProbeDisplay.groupSortOrder(displayName)
+                )
+            }
+            .sorted { lhs, rhs in
+                (lhs.displayOrder, lhs.displayName) < (rhs.displayOrder, rhs.displayName)
+            }
+
+        issues = serviceHealth.issues
+            .filter(\.isIssue)
+            .map(ServiceIssue.init(compactIssue:))
             .sorted { lhs, rhs in
                 (lhs.level.sortPriority, lhs.displayOrder, lhs.label) < (rhs.level.sortPriority, rhs.displayOrder, rhs.label)
             }
@@ -150,6 +203,19 @@ private struct ServiceIssue: Identifiable {
         measuredAt = ChartDateParser.parse(sample.ts)
         displayOrder = serviceSample.displayOrder
     }
+
+    nonisolated init(compactIssue: CompactServiceHealthIssue) {
+        name = compactIssue.name
+        label = compactIssue.displayLabel
+        group = compactIssue.group
+        category = compactIssue.category
+        level = compactIssue.level
+        httpStatusCode = compactIssue.httpStatusCode
+        error = compactIssue.reason
+        durationMs = compactIssue.durationMs
+        measuredAt = compactIssue.measuredAt
+        displayOrder = ServiceProbeDisplay.groupSortOrder(ServiceProbeDisplay.groupName(group: compactIssue.group, category: compactIssue.category))
+    }
 }
 
 private struct ServiceGroupSummaryRow: View {
@@ -187,6 +253,7 @@ private struct ServiceGroupSummaryRow: View {
             RoundedRectangle(cornerRadius: 7)
                 .stroke(group.level.dashboardAccentColor.opacity(0.18), lineWidth: 1)
         )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

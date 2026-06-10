@@ -42,6 +42,28 @@ struct MonitoringStatus: Codable {
         case reasons
     }
 
+    init(
+        alert: Bool,
+        source: String?,
+        statusId: String?,
+        generatedAt: Date?,
+        level: MonitoringLevel,
+        title: String,
+        message: String,
+        primaryReason: MonitoringReason?,
+        reasons: [MonitoringReason]
+    ) {
+        self.alert = alert
+        self.source = source
+        self.statusId = statusId
+        self.generatedAt = generatedAt
+        self.level = level
+        self.title = title
+        self.message = message
+        self.primaryReason = primaryReason
+        self.reasons = reasons
+    }
+
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         alert = try container.decodeIfPresent(Bool.self, forKey: .alert) ?? false
