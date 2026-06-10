@@ -77,7 +77,7 @@ enum MonitoringLevel: String, Codable, Equatable {
         rawValue.uppercased()
     }
 
-    var sortPriority: Int {
+    nonisolated var sortPriority: Int {
         switch self {
         case .critical:
             return 0

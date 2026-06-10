@@ -108,51 +108,8 @@ private struct ServiceSample {
     }
 
     nonisolated var displayGroupName: String {
-        if let group = sample.group?.lowercased(), let displayName = Self.groupDisplayNames[group] {
-            return displayName
-        }
-
-        if let category = sample.category?.lowercased(), let displayName = Self.categoryDisplayNames[category] {
-            return displayName
-        }
-
-        if let group = sample.group, !group.isEmpty {
-            return prettifyIdentifier(group)
-        }
-
-        if let category = sample.category, !category.isEmpty {
-            return prettifyIdentifier(category)
-        }
-
-        return "Other"
+        ServiceProbeDisplay.groupName(group: sample.group, category: sample.category)
     }
-
-    nonisolated private static let groupDisplayNames: [String: String] = [
-        "github": "Dev Core",
-        "openai": "AI",
-        "laravel": "Deploy",
-        "docker": "Container",
-        "baseline": "Baseline",
-        "youtube": "Entertainment",
-        "netflix": "Entertainment",
-        "steam": "Entertainment",
-        "psn": "Game",
-        "pcgame": "Game",
-        "aws": "Cloud",
-        "azure": "Cloud",
-        "cloudflare": "Cloud",
-        "slack": "Service"
-    ]
-
-    nonisolated private static let categoryDisplayNames: [String: String] = [
-        "dev": "Dev Core",
-        "ai": "AI",
-        "cloud": "Cloud",
-        "container": "Container",
-        "game": "Game",
-        "service": "Service",
-        "baseline": "Baseline"
-    ]
 }
 
 private struct ServiceGroupSummary: Identifiable {
@@ -183,7 +140,7 @@ private struct ServiceIssue: Identifiable {
         let sample = serviceSample.sample
 
         name = sample.name
-        label = sample.displayName ?? prettifyIdentifier(sample.name)
+        label = ServiceProbeDisplay.label(for: sample)
         group = sample.group
         category = sample.category
         level = serviceSample.level
@@ -286,17 +243,6 @@ private struct ServiceIssueRow: View {
 
         return parts.joined(separator: "  ")
     }
-}
-
-nonisolated private func prettifyIdentifier(_ value: String) -> String {
-    value
-        .split { character in
-            character == "_" || character == "-"
-        }
-        .map { word in
-            word.prefix(1).uppercased() + word.dropFirst()
-        }
-        .joined(separator: " ")
 }
 
 private extension MonitoringLevel {

@@ -67,6 +67,7 @@ struct HTTPSample: Codable, Identifiable {
     let ts: String
     let type: String
     let name: String
+    let label: String?
     let displayName: String?
     let displayOrder: Int?
     let group: String?
@@ -75,6 +76,8 @@ struct HTTPSample: Codable, Identifiable {
     let url: String?
     let method: String?
     let httpStatus: Int?
+    let expectedStatuses: [Int]?
+    let expectedStatusCodes: [Int]?
     let dnsMs: Double?
     let connectMs: Double?
     let tlsMs: Double?

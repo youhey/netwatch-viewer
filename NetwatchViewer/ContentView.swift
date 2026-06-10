@@ -23,6 +23,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Charts", systemImage: "chart.xyaxis.line")
                 }
+
+            ServicesView(latest: viewModel.latest, thresholds: viewModel.thresholds)
+                .tabItem {
+                    Label("Services", systemImage: "server.rack")
+                }
         }
         .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
         .task {
@@ -41,28 +46,19 @@ struct ContentView: View {
                 .padding(.horizontal, 8)
             }
 
-            ToolbarItem(placement: .principal) {
-                Color.clear
-                    .frame(width: 1, height: 1)
-            }
-
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 10) {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
                     Text("Auto Refresh 10s")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .padding(.leading, 18)
 
                     Button {
                         Task {
                             await viewModel.reload()
                         }
                     } label: {
-                        Label("Reload", systemImage: "arrow.clockwise")
+                        ReloadIcon(isLoading: viewModel.isLoading)
                     }
                     .disabled(viewModel.isLoading)
                 }
@@ -118,6 +114,19 @@ struct ContentView: View {
 
     private var appAccentColor: Color {
         Color(red: 0.27, green: 0.78, blue: 0.96)
+    }
+}
+
+private struct ReloadIcon: View {
+    let isLoading: Bool
+
+    var body: some View {
+        Image(systemName: "arrow.clockwise")
+            .rotationEffect(.degrees(isLoading ? 360 : 0))
+            .animation(
+                isLoading ? .linear(duration: 0.9).repeatForever(autoreverses: false) : .default,
+                value: isLoading
+            )
     }
 }
 
