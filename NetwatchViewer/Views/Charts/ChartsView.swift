@@ -12,6 +12,8 @@ struct ChartsView: View {
     @State private var selectedPingNames: Set<String> = []
     @State private var selectedHTTPNames: Set<String> = []
     @State private var selectedDownloadNames: Set<String> = []
+    @State private var selectedSpeedprobeThroughputNames: Set<String> = []
+    @State private var selectedSpeedprobeDurationNames: Set<String> = []
     @State private var selectedServiceGroups: Set<String> = []
 
     var body: some View {
@@ -24,6 +26,12 @@ struct ChartsView: View {
                 HTTPDurationChartView(series: viewModel.httpSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedHTTPNames)
                 if viewModel.showsDownloadChart {
                     DownloadThroughputChartView(series: viewModel.downloadSeries, thresholds: viewModel.thresholds, catalog: viewModel.catalog, selectedNames: $selectedDownloadNames)
+                }
+                if !viewModel.speedprobeThroughputSeries.isEmpty {
+                    SpeedprobeThroughputChartView(series: viewModel.speedprobeThroughputSeries, catalog: viewModel.catalog, selectedNames: $selectedSpeedprobeThroughputNames)
+                }
+                if !viewModel.speedprobeDurationSeries.isEmpty {
+                    SpeedprobeDurationChartView(series: viewModel.speedprobeDurationSeries, catalog: viewModel.catalog, selectedNames: $selectedSpeedprobeDurationNames)
                 }
                 ServiceGroupChartView(series: viewModel.serviceSeries, catalog: viewModel.catalog, selectedGroups: $selectedServiceGroups)
             }
@@ -102,6 +110,8 @@ struct ChartsView: View {
         selectedPingNames = []
         selectedHTTPNames = []
         selectedDownloadNames = []
+        selectedSpeedprobeThroughputNames = []
+        selectedSpeedprobeDurationNames = []
         selectedServiceGroups = []
     }
 }

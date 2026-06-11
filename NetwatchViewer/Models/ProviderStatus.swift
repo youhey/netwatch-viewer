@@ -18,6 +18,7 @@ struct MonitoringCompactResponse: Decodable {
     let issueCount: Int?
     let reasons: [MonitoringReason]?
     let networkStatus: CompactNetworkStatus?
+    let throughputStatus: ThroughputStatus?
     let serviceHealth: CompactServiceHealth?
     let providerStatus: ProviderStatusSummary?
 
@@ -32,6 +33,7 @@ struct MonitoringCompactResponse: Decodable {
         case issueCount
         case reasons
         case networkStatus
+        case throughputStatus
         case serviceHealth
         case providerStatus
     }
@@ -48,6 +50,7 @@ struct MonitoringCompactResponse: Decodable {
         issueCount = try container.decodeIfPresent(Int.self, forKey: .issueCount)
         reasons = try container.decodeIfPresent([MonitoringReason].self, forKey: .reasons)
         networkStatus = try container.decodeIfPresent(CompactNetworkStatus.self, forKey: .networkStatus)
+        throughputStatus = try container.decodeIfPresent(ThroughputStatus.self, forKey: .throughputStatus)
         serviceHealth = try container.decodeIfPresent(CompactServiceHealth.self, forKey: .serviceHealth)
         providerStatus = try container.decodeIfPresent(ProviderStatusSummary.self, forKey: .providerStatus)
     }
@@ -114,6 +117,153 @@ struct CompactNetworkStatus: Decodable {
             primaryReason: resolvedReasons.first,
             reasons: resolvedReasons
         )
+    }
+}
+
+struct ThroughputStatus: Decodable {
+    let level: MonitoringLevel?
+    let alert: Bool?
+    let issueCount: Int?
+    let sources: [ThroughputSource]
+
+    enum CodingKeys: String, CodingKey {
+        case level
+        case alert
+        case issueCount
+        case sources
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        level = try container.decodeIfPresent(MonitoringLevel.self, forKey: .level)
+        alert = try container.decodeIfPresent(Bool.self, forKey: .alert)
+        issueCount = try container.decodeIfPresent(Int.self, forKey: .issueCount)
+        sources = try container.decodeIfPresent([ThroughputSource].self, forKey: .sources) ?? []
+    }
+
+    var allProbes: [ThroughputProbe] {
+        sources.flatMap(\.probes)
+    }
+
+    var issueProbes: [ThroughputProbe] {
+        allProbes.filter(\.isIssue)
+    }
+
+    var effectiveLevel: MonitoringLevel {
+        level ?? worstLevel(sources.map(\.level) + allProbes.map(\.level))
+    }
+
+    var effectiveIssueCount: Int {
+        issueCount ?? issueProbes.count
+    }
+
+    private func worstLevel(_ levels: [MonitoringLevel]) -> MonitoringLevel {
+        levels.min { lhs, rhs in
+            lhs.sortPriority < rhs.sortPriority
+        } ?? .unknown
+    }
+}
+
+struct ThroughputSource: Decodable, Identifiable {
+    var id: String { name }
+
+    let name: String
+    let label: String?
+    let type: String?
+    let level: MonitoringLevel
+    let observer: ThroughputObserver?
+    let probes: [ThroughputProbe]
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case label
+        case type
+        case level
+        case observer
+        case probes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "unknown"
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        level = try container.decodeIfPresent(MonitoringLevel.self, forKey: .level) ?? .unknown
+        observer = try container.decodeIfPresent(ThroughputObserver.self, forKey: .observer)
+        probes = try container.decodeIfPresent([ThroughputProbe].self, forKey: .probes) ?? []
+    }
+
+    nonisolated var displayLabel: String {
+        if let label, !label.isEmpty {
+            return label
+        }
+
+        return ServiceProbeDisplay.prettifyIdentifier(name)
+    }
+}
+
+struct ThroughputObserver: Decodable {
+    let hostname: String?
+    let interface: String?
+    let linkSpeed: String?
+    let duplex: String?
+    let operstate: String?
+}
+
+struct ThroughputProbe: Decodable, Identifiable {
+    var id: String { name }
+
+    let name: String
+    let label: String?
+    let level: MonitoringLevel
+    let status: String?
+    let reason: String?
+    let mbps: Double?
+    let durationMs: Double?
+    let expectedBytes: Int64?
+    let downloadedBytes: Int64?
+    let manualOnly: Bool?
+    let measuredAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case label
+        case level
+        case status
+        case reason
+        case mbps
+        case durationMs
+        case expectedBytes
+        case downloadedBytes
+        case manualOnly
+        case measuredAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "unknown"
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        level = try container.decodeIfPresent(MonitoringLevel.self, forKey: .level) ?? .unknown
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        reason = try container.decodeIfPresent(String.self, forKey: .reason)
+        mbps = try container.decodeIfPresent(Double.self, forKey: .mbps)
+        durationMs = try container.decodeIfPresent(Double.self, forKey: .durationMs)
+        expectedBytes = try container.decodeIfPresent(Int64.self, forKey: .expectedBytes)
+        downloadedBytes = try container.decodeIfPresent(Int64.self, forKey: .downloadedBytes)
+        manualOnly = try container.decodeIfPresent(Bool.self, forKey: .manualOnly)
+        measuredAt = ChartDateParser.parse(try container.decodeIfPresent(String.self, forKey: .measuredAt))
+    }
+
+    nonisolated var displayLabel: String {
+        if let label, !label.isEmpty {
+            return label
+        }
+
+        return ServiceProbeDisplay.prettifyIdentifier(name)
+    }
+
+    nonisolated var isIssue: Bool {
+        level != .ok
     }
 }
 

@@ -12,6 +12,7 @@ struct OverviewView: View {
     let latest: LatestResponse?
     let compactNetworkStatus: CompactNetworkStatus?
     let compactGeneratedAt: Date?
+    let throughputStatus: ThroughputStatus?
     let serviceHealth: CompactServiceHealth?
     let providerStatus: ProviderStatusSummary?
     let providerStatusError: String?
@@ -73,15 +74,15 @@ struct OverviewView: View {
     @ViewBuilder
     private var detailSections: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let latest {
+            if latest != nil || throughputStatus != nil {
                 LazyVGrid(columns: detailCardColumns, alignment: .leading, spacing: 16) {
-                    PingSectionView(samples: latest.ping, evaluator: evaluator)
+                    PingSectionView(samples: latest?.ping ?? [], evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
 
-                    DNSSectionView(samples: latest.dns, evaluator: evaluator)
+                    DNSSectionView(samples: latest?.dns ?? [], evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
 
-                    DownloadSectionView(samples: latest.download, evaluator: evaluator)
+                    ThroughputSectionView(throughputStatus: throughputStatus, fallbackSamples: latest?.download ?? [], evaluator: evaluator)
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
                 }
             } else {
@@ -238,11 +239,12 @@ struct OverviewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     let networkReasons = activeNetworkReasons
+                    let throughputIssues = sortedThroughputProbes(throughputStatus?.issueProbes ?? [])
                     let serviceIssues = serviceHealth?.issues.filter(\.isIssue) ?? []
                     let providerIssues = providerStatus?.issueProviders ?? []
 
                     if displayStatus != nil {
-                        if networkReasons.isEmpty && serviceIssues.isEmpty && providerIssues.isEmpty {
+                        if networkReasons.isEmpty && throughputIssues.isEmpty && serviceIssues.isEmpty && providerIssues.isEmpty {
                             HStack(spacing: 8) {
                                 SeverityChip(level: .ok)
                                 Text("No active issues")
@@ -253,6 +255,10 @@ struct OverviewView: View {
                                 ActiveIssueRow(reason: reason, isPrimary: reason == displayStatus?.primaryReason)
                             }
 
+                            ForEach(Array(throughputIssues.enumerated()), id: \.offset) { _, issue in
+                                ActiveThroughputIssueRow(issue: issue)
+                            }
+
                             ForEach(serviceIssues) { issue in
                                 ActiveServiceIssueRow(issue: issue)
                             }
@@ -261,10 +267,14 @@ struct OverviewView: View {
                                 ActiveProviderIssueRow(provider: provider)
                             }
                         }
-                    } else if serviceIssues.isEmpty && providerIssues.isEmpty {
+                    } else if throughputIssues.isEmpty && serviceIssues.isEmpty && providerIssues.isEmpty {
                         Text("No status loaded.")
                             .foregroundStyle(.secondary)
                     } else {
+                        ForEach(Array(throughputIssues.enumerated()), id: \.offset) { _, issue in
+                            ActiveThroughputIssueRow(issue: issue)
+                        }
+
                         ForEach(serviceIssues) { issue in
                             ActiveServiceIssueRow(issue: issue)
                         }
@@ -333,7 +343,7 @@ struct OverviewView: View {
                 DashboardMetric(title: "Gateway RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "network"),
                 DashboardMetric(title: "External RTT", value: "-", unit: "ms", subtitle: "No ping data", severity: .unknown, systemImage: "globe"),
                 DashboardMetric(title: "Packet Loss", value: "-", unit: "%", subtitle: "No ping data", severity: .unknown, systemImage: "point.3.connected.trianglepath.dotted"),
-                DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download data", severity: .unknown, systemImage: "arrow.down.circle"),
+                throughputMetric(latest: nil),
                 compactServiceMetric() ?? DashboardMetric(title: "Service Health", value: "-", unit: nil, subtitle: "No service data", severity: .unknown, systemImage: "server.rack")
             ]
         }
@@ -342,7 +352,7 @@ struct OverviewView: View {
             gatewayMetric(latest),
             externalRTTMetric(latest),
             packetLossMetric(latest),
-            downloadMetric(latest),
+            throughputMetric(latest: latest),
             servicesMetric(latest)
         ]
     }
@@ -454,15 +464,35 @@ struct OverviewView: View {
         )
     }
 
-    private func downloadMetric(_ latest: LatestResponse) -> DashboardMetric {
+    private func throughputMetric(latest: LatestResponse?) -> DashboardMetric {
+        if let throughputStatus {
+            let probe = sortedThroughputProbes(throughputStatus.allProbes)
+                .first { $0.manualOnly != true && $0.mbps != nil }
+                ?? sortedThroughputProbes(throughputStatus.allProbes).first
+
+            return DashboardMetric(
+                title: "Throughput Status",
+                value: formatMetricValue(probe?.mbps),
+                unit: "Mbps",
+                subtitle: throughputStatus.effectiveIssueCount > 0 ? "\(throughputStatus.effectiveIssueCount) issues" : nil,
+                severity: throughputStatus.effectiveLevel,
+                systemImage: "arrow.down.circle",
+                sparkline: throughputSparkline(fallbackBase: probe?.mbps)
+            )
+        }
+
+        guard let latest else {
+            return DashboardMetric(title: "Throughput Status", value: "-", unit: "Mbps", subtitle: "No throughput data", severity: .unknown, systemImage: "arrow.down.circle")
+        }
+
         let sample = sortedDownloadSamples(latest.download).first
 
         guard let sample else {
-            return DashboardMetric(title: "Download", value: "-", unit: "Mbps", subtitle: "No download probes", severity: .unknown, systemImage: "arrow.down.circle")
+            return DashboardMetric(title: "Throughput Status", value: "-", unit: "Mbps", subtitle: "No download probes", severity: .unknown, systemImage: "arrow.down.circle")
         }
 
         return DashboardMetric(
-            title: "Download",
+            title: "Throughput Status",
             value: formatMetricValue(sample.mbps),
             unit: "Mbps",
             subtitle: sample.ok ? nil : "Probe failed",
@@ -536,6 +566,17 @@ struct OverviewView: View {
         return fallbackSparklineValues(base: fallbackBase)
     }
 
+    private func throughputSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedSpeedprobeSeries(overviewChart?.speedprobe ?? []).first(where: \.isThroughputSeries) {
+            let values = series.points.compactMap(\.throughputValue)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return downloadSparkline(fallbackBase: fallbackBase)
+    }
+
     private func sortedPingSamples(_ samples: [PingSample]) -> [PingSample] {
         samples.sorted { lhs, rhs in
             (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
@@ -557,6 +598,18 @@ struct OverviewView: View {
     private func sortedDownloadSeries(_ series: [DownloadChartSeries]) -> [DownloadChartSeries] {
         series.sorted { lhs, rhs in
             (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedSpeedprobeSeries(_ series: [SpeedprobeChartSeries]) -> [SpeedprobeChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedThroughputProbes(_ probes: [ThroughputProbe]) -> [ThroughputProbe] {
+        probes.sorted { lhs, rhs in
+            (lhs.level.sortPriority, lhs.name) < (rhs.level.sortPriority, rhs.name)
         }
     }
 
@@ -588,10 +641,21 @@ struct OverviewView: View {
                 return false
             }
 
+            if throughputStatus != nil, isThroughputReason(reason) {
+                return false
+            }
+
             return true
         }
 
         return sortedReasons(filteredReasons)
+    }
+
+    private func isThroughputReason(_ reason: MonitoringReason) -> Bool {
+        reason.code == "throughput_status"
+            || reason.code.hasPrefix("throughput_")
+            || reason.code.hasPrefix("speedprobe_")
+            || reason.code.hasPrefix("download_")
     }
 
     private func formatMetricValue(_ value: Double?) -> String {
@@ -774,6 +838,60 @@ private struct ActiveServiceIssueRow: View {
         }
 
         return parts.isEmpty ? "Service health issue" : parts.joined(separator: "  ")
+    }
+}
+
+private struct ActiveThroughputIssueRow: View {
+    let issue: ThroughputProbe
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SeverityChip(level: issue.level)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(issue.displayLabel)
+                        .fontWeight(.semibold)
+
+                    Text("Throughput")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                }
+
+                Text(issueDetailText)
+                    .font(.caption)
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var issueDetailText: String {
+        var parts: [String] = []
+
+        if let reason = issue.reason, !reason.isEmpty {
+            parts.append(reason)
+        } else if let status = issue.status, !status.isEmpty {
+            parts.append(status)
+        }
+
+        if issue.mbps != nil {
+            parts.append("\(formatMetric(issue.mbps)) Mbps")
+        }
+
+        if issue.durationMs != nil {
+            parts.append(formatMilliseconds(issue.durationMs))
+        }
+
+        return parts.isEmpty ? "Throughput issue" : parts.joined(separator: "  ")
+    }
+
+    private func formatMetric(_ value: Double?) -> String {
+        guard let value else {
+            return "-"
+        }
+
+        return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 }
 

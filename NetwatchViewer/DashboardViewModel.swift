@@ -14,6 +14,7 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var latest: LatestResponse?
     @Published private(set) var compactNetworkStatus: CompactNetworkStatus?
     @Published private(set) var compactGeneratedAt: Date?
+    @Published private(set) var throughputStatus: ThroughputStatus?
     @Published private(set) var serviceHealth: CompactServiceHealth?
     @Published private(set) var providerStatus: ProviderStatusSummary?
     @Published private(set) var providerStatusError: String?
@@ -248,6 +249,7 @@ final class DashboardViewModel: ObservableObject {
             let compact = try await client.fetchMonitoringCompact()
             compactNetworkStatus = compact.resolvedNetworkStatus
             compactGeneratedAt = compact.generatedAt
+            throughputStatus = compact.throughputStatus
             serviceHealth = compact.serviceHealth
 
             if let providerStatus = compact.providerStatus {
@@ -258,6 +260,7 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             compactNetworkStatus = nil
             compactGeneratedAt = nil
+            throughputStatus = nil
             serviceHealth = nil
             await refreshProviderStatusFallback(compactError: error)
             return

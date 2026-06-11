@@ -121,6 +121,7 @@ struct ContentView: View {
                     latest: viewModel.latest,
                     compactNetworkStatus: viewModel.compactNetworkStatus,
                     compactGeneratedAt: viewModel.compactGeneratedAt,
+                    throughputStatus: viewModel.throughputStatus,
                     serviceHealth: viewModel.serviceHealth,
                     providerStatus: viewModel.providerStatus,
                     providerStatusError: viewModel.providerStatusError,

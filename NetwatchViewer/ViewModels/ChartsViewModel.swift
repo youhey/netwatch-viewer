@@ -20,6 +20,7 @@ final class ChartsViewModel: ObservableObject {
     @Published private(set) var pingSeries: [PingChartSeries] = []
     @Published private(set) var httpSeries: [HTTPChartSeries] = []
     @Published private(set) var downloadSeries: [DownloadChartSeries] = []
+    @Published private(set) var speedprobeSeries: [SpeedprobeChartSeries] = []
     @Published private(set) var serviceSeries: [ServiceChartSeries] = []
     @Published private(set) var isLoadingSupport = false
     @Published private(set) var isLoading = false
@@ -65,6 +66,14 @@ final class ChartsViewModel: ObservableObject {
         }
 
         return !downloadSeries.isEmpty || !(catalog?.download.isEmpty ?? true)
+    }
+
+    var speedprobeThroughputSeries: [SpeedprobeChartSeries] {
+        speedprobeSeries.filter(\.isThroughputSeries)
+    }
+
+    var speedprobeDurationSeries: [SpeedprobeChartSeries] {
+        speedprobeSeries.filter(\.isDurationSeries)
     }
 
     func startAutoRefresh() {
@@ -208,6 +217,7 @@ final class ChartsViewModel: ObservableObject {
         pingSeries = sortedPingSeries(overview.ping)
         httpSeries = sortedHTTPSeries(overview.http)
         downloadSeries = sortedDownloadSeries(overview.download)
+        speedprobeSeries = sortedSpeedprobeSeries(overview.speedprobe)
         serviceSeries = sortedServiceSeries(overview.serviceGroups)
         metadata = ChartsMetadata(overview: overview)
         lastUpdated = Date()
@@ -217,6 +227,7 @@ final class ChartsViewModel: ObservableObject {
         var nextPingSeries: [PingChartSeries] = []
         var nextHTTPSeries: [HTTPChartSeries] = []
         var nextDownloadSeries: [DownloadChartSeries] = []
+        let nextSpeedprobeSeries: [SpeedprobeChartSeries] = []
         var nextServiceSeries: [ServiceChartSeries] = []
         var errors: [String] = []
 
@@ -258,10 +269,11 @@ final class ChartsViewModel: ObservableObject {
             }
         }
 
-        if !nextPingSeries.isEmpty || !nextHTTPSeries.isEmpty || !nextDownloadSeries.isEmpty || !nextServiceSeries.isEmpty {
+        if !nextPingSeries.isEmpty || !nextHTTPSeries.isEmpty || !nextDownloadSeries.isEmpty || !nextSpeedprobeSeries.isEmpty || !nextServiceSeries.isEmpty {
             pingSeries = sortedPingSeries(nextPingSeries)
             httpSeries = sortedHTTPSeries(nextHTTPSeries)
             downloadSeries = sortedDownloadSeries(nextDownloadSeries)
+            speedprobeSeries = sortedSpeedprobeSeries(nextSpeedprobeSeries)
             serviceSeries = sortedServiceSeries(nextServiceSeries)
             metadata = ChartsMetadata(
                 generatedAt: [nextPingSeries.first?.generatedAt, nextHTTPSeries.first?.generatedAt, nextDownloadSeries.first?.generatedAt, nextServiceSeries.first?.generatedAt].compactMap { $0 }.first,
@@ -325,6 +337,12 @@ final class ChartsViewModel: ObservableObject {
     }
 
     private func sortedDownloadSeries(_ series: [DownloadChartSeries]) -> [DownloadChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedSpeedprobeSeries(_ series: [SpeedprobeChartSeries]) -> [SpeedprobeChartSeries] {
         series.sorted { lhs, rhs in
             (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
         }
