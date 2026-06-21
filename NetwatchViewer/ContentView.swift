@@ -29,6 +29,15 @@ enum ViewerMode: String, CaseIterable, Identifiable {
             return "Services"
         }
     }
+
+    var windowContentSize: NSSize {
+        switch self {
+        case .compact:
+            return NSSize(width: 820, height: 500)
+        case .overview, .charts, .services:
+            return NSSize(width: 1420, height: 1200)
+        }
+    }
 }
 
 struct ContentView: View {
@@ -41,6 +50,7 @@ struct ContentView: View {
     @State private var isExportFileExporterPresented = false
     @State private var exportDocument = AIAnalysisExportDocument()
     @State private var exportDefaultFilename = AIAnalysisExportRange.oneDay.defaultFilename
+    @State private var dashboardWindow: NSWindow?
 
     var body: some View {
         content
@@ -49,8 +59,17 @@ struct ContentView: View {
                 minHeight: viewerMode == .compact ? 360 : 560,
                 alignment: .topLeading
             )
+            .background(
+                WindowAccessor { window in
+                    dashboardWindow = window
+                    resizeDashboardWindow(for: viewerMode, animated: false)
+                }
+            )
             .task {
                 viewModel.startAutoRefresh()
+            }
+            .onChange(of: viewerMode) { _, newMode in
+                resizeDashboardWindow(for: newMode, animated: true)
             }
             .toolbar {
                 ToolbarItem(placement: .navigation) {
@@ -66,13 +85,7 @@ struct ContentView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    Picker("Viewer", selection: $viewerMode) {
-                        ForEach(ViewerMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 360)
+                    ViewerModeControl(selection: $viewerMode)
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -206,6 +219,26 @@ struct ContentView: View {
     }
 
     @MainActor
+    private func resizeDashboardWindow(for mode: ViewerMode, animated: Bool) {
+        guard let dashboardWindow else {
+            return
+        }
+
+        let targetSize = mode.windowContentSize
+        let currentContentSize = dashboardWindow.contentLayoutRect.size
+        guard abs(currentContentSize.width - targetSize.width) > 0.5
+            || abs(currentContentSize.height - targetSize.height) > 0.5 else {
+            return
+        }
+
+        let frameRect = dashboardWindow.frameRect(forContentRect: NSRect(origin: .zero, size: targetSize))
+        var frame = dashboardWindow.frame
+        frame.origin.y += frame.height - frameRect.height
+        frame.size = frameRect.size
+        dashboardWindow.setFrame(frame, display: true, animate: animated)
+    }
+
+    @MainActor
     private func exportAIAnalysis(range: AIAnalysisExportRange) async {
         isExportProgressPresented = true
 
@@ -264,6 +297,64 @@ private struct ReloadIcon: View {
                 isLoading ? .linear(duration: 0.9).repeatForever(autoreverses: false) : .default,
                 value: isLoading
             )
+    }
+}
+
+private struct ViewerModeControl: View {
+    @Binding var selection: ViewerMode
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(ViewerMode.allCases) { mode in
+                Button {
+                    selection = mode
+                } label: {
+                    Text(mode.title)
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(selection == mode ? .semibold : .medium)
+                        .foregroundStyle(selection == mode ? Color.white.opacity(0.96) : Color.white.opacity(0.82))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(selection == mode ? Color.white.opacity(0.16) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .frame(width: 360)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+    }
+}
+
+private struct WindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                onResolve(window)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let window = nsView.window {
+                onResolve(window)
+            }
+        }
     }
 }
 
