@@ -9,25 +9,31 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum DisplayMode: String, CaseIterable, Identifiable {
-    case normal
+enum ViewerMode: String, CaseIterable, Identifiable {
     case compact
+    case overview
+    case charts
+    case services
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .normal:
-            return "Normal"
         case .compact:
             return "Compact"
+        case .overview:
+            return "Overview"
+        case .charts:
+            return "Charts"
+        case .services:
+            return "Services"
         }
     }
 }
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
-    @AppStorage("netwatch.displayMode") private var displayMode: DisplayMode = .normal
+    @AppStorage("netwatch.viewerMode") private var viewerMode: ViewerMode = .overview
     @StateObject private var chartsViewModel = ChartsViewModel()
     @State private var showsErrorDetails = false
     @State private var exportAlert: ExportAlert?
@@ -39,8 +45,8 @@ struct ContentView: View {
     var body: some View {
         content
             .frame(
-                minWidth: displayMode == .compact ? 320 : 760,
-                minHeight: displayMode == .compact ? 360 : 560,
+                minWidth: viewerMode == .compact ? 320 : 760,
+                minHeight: viewerMode == .compact ? 360 : 560,
                 alignment: .topLeading
             )
             .task {
@@ -60,13 +66,13 @@ struct ContentView: View {
                 }
 
                 ToolbarItem(placement: .principal) {
-                    Picker("Display Mode", selection: $displayMode) {
-                        ForEach(DisplayMode.allCases) { mode in
+                    Picker("Viewer", selection: $viewerMode) {
+                        ForEach(ViewerMode.allCases) { mode in
                             Text(mode.title).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 360)
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -131,30 +137,16 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        if displayMode == .compact {
+        switch viewerMode {
+        case .compact:
             NetwatchCompactView()
                 .environmentObject(viewModel)
-        } else {
-            normalContent
-        }
-    }
-
-    private var normalContent: some View {
-        TabView {
+        case .overview:
             overviewTab
-                .tabItem {
-                    Label("Overview", systemImage: "list.bullet.rectangle")
-                }
-
+        case .charts:
             ChartsView(viewModel: chartsViewModel)
-                .tabItem {
-                    Label("Charts", systemImage: "chart.xyaxis.line")
-                }
-
+        case .services:
             ServicesView(latest: viewModel.latest, thresholds: viewModel.thresholds)
-                .tabItem {
-                    Label("Services", systemImage: "server.rack")
-                }
         }
     }
 

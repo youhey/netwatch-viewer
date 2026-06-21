@@ -17,7 +17,6 @@ struct NetwatchCompactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                compactHeader
                 topSummaryRow
                 metricGrid
             }
@@ -27,24 +26,21 @@ struct NetwatchCompactView: View {
         .background(Color(red: 0.025, green: 0.035, blue: 0.055))
     }
 
-    private var compactHeader: some View {
-        HStack {
-            Spacer(minLength: 8)
-
-            Text("Updated \(formatTime(displayUpdatedAt))")
-                .font(.caption)
-                .foregroundStyle(Color.white.opacity(0.66))
-                .monospacedDigit()
-        }
-    }
-
     private var topSummaryRow: some View {
-        HStack(alignment: .top, spacing: 8) {
-            compactHero
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 8) {
+                compactHero
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
 
-            compactStatusHistory
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                compactStatusHistory
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .frame(minWidth: 520)
+
+            VStack(alignment: .leading, spacing: 8) {
+                compactHero
+                compactStatusHistory
+            }
         }
     }
 
@@ -71,6 +67,7 @@ struct NetwatchCompactView: View {
                 compactMeta("Issues", compactIssueCountText)
                 compactMeta("Alert", displayStatus?.alert == true ? "true" : "false")
                 compactMeta("Ack", isAcknowledged ? "true" : "false")
+                compactMeta("Updated", formatTime(displayUpdatedAt))
             }
         }
         .padding(10)
@@ -86,10 +83,29 @@ struct NetwatchCompactView: View {
     }
 
     private var metricGrid: some View {
-        HStack(spacing: 8) {
-            ForEach(compactMetrics) { metric in
-                CompactMetricTile(metric: metric)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ForEach(compactMetrics) { metric in
+                    CompactMetricTile(metric: metric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .frame(minWidth: 520)
+
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    CompactMetricTile(metric: gatewayMetric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    CompactMetricTile(metric: externalMetric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                HStack(spacing: 8) {
+                    CompactMetricTile(metric: packetLossMetric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    CompactMetricTile(metric: throughputMetric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
     }
