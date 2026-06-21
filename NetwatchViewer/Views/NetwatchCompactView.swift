@@ -29,57 +29,38 @@ struct NetwatchCompactView: View {
     private var topSummaryRow: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 8) {
-                compactHero
+                statusOverview
                     .frame(maxWidth: .infinity, alignment: .topLeading)
 
                 compactStatusHistory
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .frame(minWidth: 520)
+            .frame(minWidth: 760)
 
             VStack(alignment: .leading, spacing: 8) {
-                compactHero
+                statusOverview
                 compactStatusHistory
             }
         }
     }
 
-    private var compactHero: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 10) {
-                CompactStatusBadge(level: displayLevel)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(compactTitle)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(displayLevel.dashboardAccentColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-
-                    Text(compactMessage)
-                        .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.68))
-                        .lineLimit(2)
-                }
-            }
-
-            HStack(spacing: 14) {
-                compactMeta("Issues", compactIssueCountText)
-                compactMeta("Alert", displayStatus?.alert == true ? "true" : "false")
-                compactMeta("Ack", isAcknowledged ? "true" : "false")
-                compactMeta("Updated", formatTime(displayUpdatedAt))
+    @ViewBuilder
+    private var statusOverview: some View {
+        if let displayStatus {
+            StatusSummaryCard(
+                status: displayStatus,
+                updatedAt: displayStatus.generatedAt ?? viewModel.lastUpdated,
+                alertState: viewModel.alertState,
+                titleOverride: viewModel.compactNetworkStatus?.title,
+                messageOverride: viewModel.compactNetworkStatus?.message,
+                issueCountOverride: viewModel.compactNetworkStatus?.issueCount
+            )
+        } else {
+            SectionCard(title: "Status", systemImage: "shield.lefthalf.filled") {
+                Text("No status loaded.")
+                    .foregroundStyle(Color.white.opacity(0.68))
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(displayLevel.dashboardSurfaceColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(displayLevel.dashboardAccentColor.opacity(0.35), lineWidth: 1)
-        )
     }
 
     private var metricGrid: some View {
@@ -111,71 +92,61 @@ struct NetwatchCompactView: View {
     }
 
     private var compactStatusHistory: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Status History 24h")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.white.opacity(0.82))
-
-                Spacer()
-
-                if viewModel.statusHistorySource == .api, let generatedAt = viewModel.statusHistory?.generatedAt {
-                    Text(formatTime(generatedAt))
-                        .font(.caption2)
-                        .foregroundStyle(Color.white.opacity(0.54))
-                        .monospacedDigit()
+        SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath", fillsVertically: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.statusHistoryBuckets.isEmpty {
+                    Text("Status history is not available yet.")
+                        .font(.caption)
+                        .foregroundStyle(Color.white.opacity(0.64))
+                } else {
+                    HStack(spacing: 4) {
+                        ForEach(viewModel.statusHistoryBuckets) { bucket in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(bucket.level.dashboardAccentColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 16)
+                                .opacity(bucket.level == .unknown ? 0.55 : 0.9)
+                        }
+                    }
+                    .frame(height: 18)
                 }
-            }
 
-            if viewModel.statusHistoryBuckets.isEmpty {
-                Text("Status history is not available yet.")
-                    .font(.caption)
-                    .foregroundStyle(Color.white.opacity(0.62))
-            } else {
-                HStack(spacing: 3) {
-                    ForEach(viewModel.statusHistoryBuckets) { bucket in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(bucket.level.dashboardAccentColor)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 14)
-                            .opacity(bucket.level == .unknown ? 0.55 : 0.92)
+                LazyVGrid(columns: statusLegendColumns, alignment: .leading, spacing: 7) {
+                    ForEach(statusLegendLevels, id: \.rawValue) { level in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(level.dashboardAccentColor)
+                                .frame(width: 7, height: 7)
+
+                            Text(statusLegendLabel(for: level))
+                                .font(.caption2)
+                                .foregroundStyle(Color.white.opacity(0.72))
+                        }
                     }
                 }
-                .frame(height: 16)
 
-                Text(statusHistoryCountText)
-                    .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.70))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if let summaryText = statusHistorySummaryText {
+                    Text(summaryText)
+                        .font(.caption2)
+                        .foregroundStyle(Color.white.opacity(0.68))
+                        .lineLimit(1)
+                }
+
+                if let metadataText = statusHistoryMetadataText {
+                    Text(metadataText)
+                        .font(.caption2)
+                        .foregroundStyle(Color.white.opacity(0.58))
+                        .lineLimit(1)
+                }
+
+                if let statusHistoryError = viewModel.statusHistoryError, viewModel.statusHistorySource != .api {
+                    Text(statusHistoryError)
+                        .font(.caption2)
+                        .foregroundStyle(Color.red.opacity(0.82))
+                        .lineLimit(2)
+                }
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.055, green: 0.075, blue: 0.105))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private func compactMeta(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.white.opacity(0.56))
-            Text(value)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.white.opacity(0.82))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var compactMetrics: [CompactMetric] {
@@ -189,27 +160,29 @@ struct NetwatchCompactView: View {
 
     private var gatewayMetric: CompactMetric {
         guard let sample = sortedPingSamples.first(where: { $0.name.caseInsensitiveCompare("gateway") == .orderedSame }) else {
-            return CompactMetric(title: "GW RTT", value: "--", unit: "ms", level: .unknown)
+            return CompactMetric(title: "GW RTT", value: "--", unit: "ms", level: .unknown, sparkline: [])
         }
 
         return CompactMetric(
             title: "GW RTT",
             value: formatNumber(sample.rttAvgMs),
             unit: "ms",
-            level: evaluator.severityForGatewayPing(sample)
+            level: evaluator.severityForGatewayPing(sample),
+            sparkline: gatewayRTTSparkline(fallbackBase: sample.rttAvgMs)
         )
     }
 
     private var externalMetric: CompactMetric {
         guard let sample = sortedPingSamples.first(where: { $0.name.caseInsensitiveCompare("gateway") != .orderedSame }) else {
-            return CompactMetric(title: "EXT RTT", value: "--", unit: "ms", level: .unknown)
+            return CompactMetric(title: "EXT RTT", value: "--", unit: "ms", level: .unknown, sparkline: [])
         }
 
         return CompactMetric(
             title: "EXT RTT",
             value: formatNumber(sample.rttAvgMs),
             unit: "ms",
-            level: evaluator.severityForExternalPing(sample)
+            level: evaluator.severityForExternalPing(sample),
+            sparkline: externalRTTSparkline(fallbackBase: sample.rttAvgMs)
         )
     }
 
@@ -217,14 +190,17 @@ struct NetwatchCompactView: View {
         let samples = sortedPingSamples
 
         guard !samples.isEmpty else {
-            return CompactMetric(title: "LOSS", value: "--", unit: "%", level: .unknown)
+            return CompactMetric(title: "LOSS", value: "--", unit: "%", level: .unknown, sparkline: [])
         }
+
+        let maxLoss = samples.compactMap(\.lossPercent).max()
 
         return CompactMetric(
             title: "LOSS",
-            value: formatNumber(samples.compactMap(\.lossPercent).max()),
+            value: formatNumber(maxLoss),
             unit: "%",
-            level: evaluator.severityForPacketLossSummary(samples)
+            level: evaluator.severityForPacketLossSummary(samples),
+            sparkline: packetLossSparkline(fallbackBase: maxLoss)
         )
     }
 
@@ -241,19 +217,21 @@ struct NetwatchCompactView: View {
                 title: "WAN",
                 value: formatNumber(probe?.mbps),
                 unit: "Mbps",
-                level: throughputStatus.effectiveLevel
+                level: throughputStatus.effectiveLevel,
+                sparkline: throughputSparkline(fallbackBase: probe?.mbps)
             )
         }
 
         guard let sample = sortedDownloadSamples.first else {
-            return CompactMetric(title: "WAN", value: "--", unit: "Mbps", level: .unknown)
+            return CompactMetric(title: "WAN", value: "--", unit: "Mbps", level: .unknown, sparkline: [])
         }
 
         return CompactMetric(
             title: "WAN",
             value: formatNumber(sample.mbps),
             unit: "Mbps",
-            level: evaluator.severityForDownload(sample)
+            level: evaluator.severityForDownload(sample),
+            sparkline: downloadSparkline(fallbackBase: sample.mbps)
         )
     }
 
@@ -268,48 +246,6 @@ struct NetwatchCompactView: View {
         return viewModel.monitoringStatus
     }
 
-    private var displayLevel: MonitoringLevel {
-        displayStatus?.level ?? .unknown
-    }
-
-    private var compactTitle: String {
-        if viewModel.isLoading && displayStatus == nil {
-            return "Loading..."
-        }
-
-        if viewModel.errorMessage != nil && displayStatus == nil {
-            return "Netwatch unavailable"
-        }
-
-        let title = viewModel.compactNetworkStatus?.title ?? displayStatus?.title ?? "Monitoring status unavailable"
-        return title.isEmpty ? "Monitoring status unavailable" : title
-    }
-
-    private var compactMessage: String {
-        if let message = viewModel.compactNetworkStatus?.message ?? displayStatus?.message, !message.isEmpty {
-            return message
-        }
-
-        return viewModel.errorMessage ?? "No recent monitoring status is available."
-    }
-
-    private var compactIssueCountText: String {
-        let count = viewModel.compactNetworkStatus?.issueCount ?? displayStatus?.issueCount ?? 0
-        return String(count)
-    }
-
-    private var isAcknowledged: Bool {
-        guard let statusId = displayStatus?.statusId else {
-            return false
-        }
-
-        return viewModel.alertState.acknowledgedStatusId == statusId
-    }
-
-    private var displayUpdatedAt: Date? {
-        displayStatus?.generatedAt ?? viewModel.lastUpdated
-    }
-
     private var sortedPingSamples: [PingSample] {
         (viewModel.latest?.ping ?? []).sorted { lhs, rhs in
             (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
@@ -322,15 +258,135 @@ struct NetwatchCompactView: View {
         }
     }
 
-    private var statusHistoryCountText: String {
-        if viewModel.statusHistorySource == .api, let summary = viewModel.statusHistory?.summary {
-            return "OK \(summary.okCount) / WARN \(summary.warningCount) / CRIT \(summary.criticalCount) / UNK \(summary.unknownCount)"
+    private func gatewayRTTSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedPingSeries(viewModel.overviewChart?.ping ?? []).first(where: { $0.name.caseInsensitiveCompare("gateway") == .orderedSame }) {
+            let values = series.points.compactMap(\.avgMs)
+            if !values.isEmpty {
+                return values
+            }
         }
 
-        let counts = Dictionary(grouping: viewModel.statusHistoryBuckets, by: \.level)
-            .mapValues(\.count)
+        return fallbackSparklineValues(base: fallbackBase)
+    }
 
-        return "OK \(counts[.ok, default: 0]) / WARN \(counts[.warning, default: 0]) / CRIT \(counts[.critical, default: 0]) / UNK \(counts[.unknown, default: 0])"
+    private func externalRTTSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedPingSeries(viewModel.overviewChart?.ping ?? []).first(where: { $0.name.caseInsensitiveCompare("gateway") != .orderedSame }) {
+            let values = series.points.compactMap(\.avgMs)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
+    }
+
+    private func packetLossSparkline(fallbackBase: Double?) -> [Double] {
+        var maxLossByTimestamp: [Date: Double] = [:]
+
+        for series in viewModel.overviewChart?.ping ?? [] {
+            for point in series.points {
+                guard let lossPercent = point.lossPercent else {
+                    continue
+                }
+
+                maxLossByTimestamp[point.ts] = max(maxLossByTimestamp[point.ts] ?? lossPercent, lossPercent)
+            }
+        }
+
+        let values = maxLossByTimestamp
+            .sorted { $0.key < $1.key }
+            .map(\.value)
+
+        return values.isEmpty ? fallbackSparklineValues(base: fallbackBase) : values
+    }
+
+    private func downloadSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedDownloadSeries(viewModel.overviewChart?.download ?? []).first {
+            let values = series.points.compactMap(\.avgMbps)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return fallbackSparklineValues(base: fallbackBase)
+    }
+
+    private func throughputSparkline(fallbackBase: Double?) -> [Double] {
+        if let series = sortedSpeedprobeSeries(viewModel.overviewChart?.speedprobe ?? []).first(where: \.isThroughputSeries) {
+            let values = series.points.compactMap(\.throughputValue)
+            if !values.isEmpty {
+                return values
+            }
+        }
+
+        return downloadSparkline(fallbackBase: fallbackBase)
+    }
+
+    private func sortedPingSeries(_ series: [PingChartSeries]) -> [PingChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedDownloadSeries(_ series: [DownloadChartSeries]) -> [DownloadChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func sortedSpeedprobeSeries(_ series: [SpeedprobeChartSeries]) -> [SpeedprobeChartSeries] {
+        series.sorted { lhs, rhs in
+            (lhs.displayOrder ?? Int.max, lhs.name) < (rhs.displayOrder ?? Int.max, rhs.name)
+        }
+    }
+
+    private func fallbackSparklineValues(base: Double?) -> [Double] {
+        guard let base else {
+            return []
+        }
+
+        if base == 0 {
+            return Array(repeating: 0, count: 8)
+        }
+
+        return [0.72, 0.66, 0.78, 0.62, 0.85, 0.70, 0.92, 0.76].map { base * $0 }
+    }
+
+    private var statusLegendColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 2)
+    }
+
+    private var statusLegendLevels: [MonitoringLevel] {
+        [.ok, .warning, .critical, .unknown]
+    }
+
+    private var statusHistoryMetadataText: String? {
+        switch viewModel.statusHistorySource {
+        case .api:
+            guard let statusHistory = viewModel.statusHistory else {
+                return nil
+            }
+
+            var parts = ["Bucket: \(statusHistory.bucket)"]
+
+            if let generatedAt = statusHistory.generatedAt {
+                parts.append("Generated: \(formatHistoryTime(generatedAt))")
+            }
+
+            return parts.joined(separator: "  ")
+        case .observed:
+            return "Observed while viewer is running"
+        case .unavailable:
+            return nil
+        }
+    }
+
+    private var statusHistorySummaryText: String? {
+        guard viewModel.statusHistorySource == .api, let summary = viewModel.statusHistory?.summary else {
+            return nil
+        }
+
+        return "OK \(summary.okCount) / WARN \(summary.warningCount) / CRIT \(summary.criticalCount) / UNK \(summary.unknownCount)"
     }
 
     private func formatNumber(_ value: Double?) -> String {
@@ -341,12 +397,21 @@ struct NetwatchCompactView: View {
         return value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
-    private func formatTime(_ date: Date?) -> String {
-        guard let date else {
-            return "--:--"
-        }
+    private func formatHistoryTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
+    }
 
-        return date.formatted(date: .omitted, time: .shortened)
+    private func statusLegendLabel(for level: MonitoringLevel) -> String {
+        switch level {
+        case .ok:
+            return "OK"
+        case .warning:
+            return "Warning"
+        case .critical:
+            return "Critical"
+        case .unknown:
+            return "Unknown"
+        }
     }
 }
 
@@ -357,6 +422,7 @@ private struct CompactMetric: Identifiable {
     let value: String
     let unit: String?
     let level: MonitoringLevel
+    let sparkline: [Double]
 }
 
 private struct CompactMetricTile: View {
@@ -392,6 +458,12 @@ private struct CompactMetricTile: View {
                         .lineLimit(1)
                 }
             }
+
+            if !metric.sparkline.isEmpty {
+                CompactMiniSparkline(values: metric.sparkline, color: Self.metricAccent)
+                    .frame(height: 22)
+                    .padding(.top, 2)
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -405,25 +477,51 @@ private struct CompactMetricTile: View {
                 .stroke(metric.level.dashboardAccentColor.opacity(metric.level == .ok ? 0.14 : 0.42), lineWidth: 1)
         )
     }
+
+    private static var metricAccent: Color {
+        Color(red: 0.27, green: 0.78, blue: 0.96)
+    }
 }
 
-private struct CompactStatusBadge: View {
-    let level: MonitoringLevel
+private struct CompactMiniSparkline: View {
+    let values: [Double]
+    let color: Color
 
     var body: some View {
-        Text(level.dashboardLabel == "UNKNOWN" ? "UNK" : level.dashboardLabel)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(level.dashboardAccentColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(level.dashboardAccentColor.opacity(0.14))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(level.dashboardAccentColor.opacity(0.42), lineWidth: 1)
-            )
+        GeometryReader { proxy in
+            ZStack(alignment: .bottomLeading) {
+                Path { path in
+                    let width = proxy.size.width
+                    let height = proxy.size.height
+                    let step = normalizedValues.count > 1 ? width / CGFloat(normalizedValues.count - 1) : width
+
+                    for index in normalizedValues.indices {
+                        let x = CGFloat(index) * step
+                        let y = height - CGFloat(normalizedValues[index]) * height
+
+                        if index == 0 {
+                            path.move(to: CGPoint(x: x, y: y))
+                        } else {
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+                .stroke(color.opacity(0.86), style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+
+                Rectangle()
+                    .fill(color.opacity(0.16))
+                    .frame(height: 1)
+                    .offset(y: -2)
+            }
+        }
+    }
+
+    private var normalizedValues: [Double] {
+        guard let maxValue = values.max(), maxValue > 0 else {
+            return values.map { _ in 0.2 }
+        }
+
+        return values.map { min(max($0 / maxValue, 0.12), 1) }
     }
 }
 

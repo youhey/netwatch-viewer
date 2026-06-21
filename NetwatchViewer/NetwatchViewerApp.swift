@@ -17,6 +17,7 @@ struct NetwatchViewerApp: App {
                 .environmentObject(viewModel)
         }
         .defaultSize(width: 1600, height: 1280)
+        .windowToolbarStyle(.unified(showsTitle: false))
 
         MenuBarExtra {
             MenuBarStatusView()
