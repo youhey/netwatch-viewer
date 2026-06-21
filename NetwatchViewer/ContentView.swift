@@ -9,8 +9,25 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum DisplayMode: String, CaseIterable, Identifiable {
+    case normal
+    case compact
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .normal:
+            return "Normal"
+        case .compact:
+            return "Compact"
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var viewModel: DashboardViewModel
+    @AppStorage("netwatch.displayMode") private var displayMode: DisplayMode = .normal
     @StateObject private var chartsViewModel = ChartsViewModel()
     @State private var showsErrorDetails = false
     @State private var exportAlert: ExportAlert?
@@ -20,6 +37,109 @@ struct ContentView: View {
     @State private var exportDefaultFilename = AIAnalysisExportRange.oneDay.defaultFilename
 
     var body: some View {
+        content
+            .frame(
+                minWidth: displayMode == .compact ? 320 : 760,
+                minHeight: displayMode == .compact ? 360 : 560,
+                alignment: .topLeading
+            )
+            .task {
+                viewModel.startAutoRefresh()
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    HStack(spacing: 10) {
+                        Text("NETWATCH")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .tracking(1.2)
+                            .foregroundStyle(appAccentColor)
+
+                        apiStatusButton
+                    }
+                    .padding(.horizontal, 14)
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Picker("Display Mode", selection: $displayMode) {
+                        ForEach(DisplayMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        ForEach(AIAnalysisExportRange.allCases) { range in
+                            Button(range.title) {
+                                Task {
+                                    await exportAIAnalysis(range: range)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(viewModel.isExporting ? "Exporting..." : "Export", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(viewModel.isExporting)
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: 10) {
+                        Text("Auto Refresh 10s")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Button {
+                            Task {
+                                await viewModel.reload()
+                            }
+                        } label: {
+                            ReloadIcon(isLoading: viewModel.isLoading)
+                        }
+                        .disabled(viewModel.isLoading)
+                    }
+                    .padding(.horizontal, 6)
+                }
+            }
+            .alert(item: $exportAlert) { alert in
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+            .overlay {
+                if isExportProgressPresented {
+                    ZStack {
+                        Color.black.opacity(0.28)
+                        ExportProgressView()
+                    }
+                }
+            }
+            .fileExporter(
+                isPresented: $isExportFileExporterPresented,
+                document: exportDocument,
+                contentType: .zip,
+                defaultFilename: exportDefaultFilename
+            ) { result in
+                Task { @MainActor in
+                    handleExportResult(result)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if displayMode == .compact {
+            NetwatchCompactView()
+                .environmentObject(viewModel)
+        } else {
+            normalContent
+        }
+    }
+
+    private var normalContent: some View {
         TabView {
             overviewTab
                 .tabItem {
@@ -35,81 +155,6 @@ struct ContentView: View {
                 .tabItem {
                     Label("Services", systemImage: "server.rack")
                 }
-        }
-        .frame(minWidth: 760, minHeight: 560, alignment: .topLeading)
-        .task {
-            viewModel.startAutoRefresh()
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: 10) {
-                    Text("NETWATCH")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .tracking(1.2)
-                        .foregroundStyle(appAccentColor)
-
-                    apiStatusButton
-                }
-                .padding(.horizontal, 14)
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    ForEach(AIAnalysisExportRange.allCases) { range in
-                        Button(range.title) {
-                            Task {
-                                await exportAIAnalysis(range: range)
-                            }
-                        }
-                    }
-                } label: {
-                    Label(viewModel.isExporting ? "Exporting..." : "Export", systemImage: "square.and.arrow.down")
-                }
-                .disabled(viewModel.isExporting)
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 10) {
-                    Text("Auto Refresh 10s")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Button {
-                        Task {
-                            await viewModel.reload()
-                        }
-                    } label: {
-                        ReloadIcon(isLoading: viewModel.isLoading)
-                    }
-                    .disabled(viewModel.isLoading)
-                }
-                .padding(.horizontal, 6)
-            }
-        }
-        .alert(item: $exportAlert) { alert in
-            Alert(
-                title: Text(alert.title),
-                message: Text(alert.message),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .overlay {
-            if isExportProgressPresented {
-                ZStack {
-                    Color.black.opacity(0.28)
-                    ExportProgressView()
-                }
-            }
-        }
-        .fileExporter(
-            isPresented: $isExportFileExporterPresented,
-            document: exportDocument,
-            contentType: .zip,
-            defaultFilename: exportDefaultFilename
-        ) { result in
-            Task { @MainActor in
-                handleExportResult(result)
-            }
         }
     }
 
