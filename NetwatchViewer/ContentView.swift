@@ -33,7 +33,7 @@ enum ViewerMode: String, CaseIterable, Identifiable {
     var windowContentSize: NSSize {
         switch self {
         case .compact:
-            return NSSize(width: 820, height: 500)
+            return NSSize(width: 800, height: 280)
         case .overview, .charts, .services:
             return NSSize(width: 1420, height: 1200)
         }
@@ -56,7 +56,7 @@ struct ContentView: View {
         content
             .frame(
                 minWidth: viewerMode == .compact ? 320 : 760,
-                minHeight: viewerMode == .compact ? 360 : 560,
+                minHeight: viewerMode == .compact ? 280 : 560,
                 alignment: .topLeading
             )
             .background(

@@ -17,31 +17,15 @@ struct NetwatchCompactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                topSummaryRow
+                statusOverview
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.bottom, 6)
                 metricGrid
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(red: 0.025, green: 0.035, blue: 0.055))
-    }
-
-    private var topSummaryRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 8) {
-                statusOverview
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                compactStatusHistory
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .frame(minWidth: 760)
-
-            VStack(alignment: .leading, spacing: 8) {
-                statusOverview
-                compactStatusHistory
-            }
-        }
     }
 
     @ViewBuilder
@@ -86,64 +70,6 @@ struct NetwatchCompactView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     CompactMetricTile(metric: throughputMetric)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private var compactStatusHistory: some View {
-        SectionCard(title: "Status History", subtitle: "Last 24h", systemImage: "clock.arrow.circlepath", fillsVertically: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                if viewModel.statusHistoryBuckets.isEmpty {
-                    Text("Status history is not available yet.")
-                        .font(.caption)
-                        .foregroundStyle(Color.white.opacity(0.64))
-                } else {
-                    HStack(spacing: 4) {
-                        ForEach(viewModel.statusHistoryBuckets) { bucket in
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(bucket.level.dashboardAccentColor)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 16)
-                                .opacity(bucket.level == .unknown ? 0.55 : 0.9)
-                        }
-                    }
-                    .frame(height: 18)
-                }
-
-                LazyVGrid(columns: statusLegendColumns, alignment: .leading, spacing: 7) {
-                    ForEach(statusLegendLevels, id: \.rawValue) { level in
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(level.dashboardAccentColor)
-                                .frame(width: 7, height: 7)
-
-                            Text(statusLegendLabel(for: level))
-                                .font(.caption2)
-                                .foregroundStyle(Color.white.opacity(0.72))
-                        }
-                    }
-                }
-
-                if let summaryText = statusHistorySummaryText {
-                    Text(summaryText)
-                        .font(.caption2)
-                        .foregroundStyle(Color.white.opacity(0.68))
-                        .lineLimit(1)
-                }
-
-                if let metadataText = statusHistoryMetadataText {
-                    Text(metadataText)
-                        .font(.caption2)
-                        .foregroundStyle(Color.white.opacity(0.58))
-                        .lineLimit(1)
-                }
-
-                if let statusHistoryError = viewModel.statusHistoryError, viewModel.statusHistorySource != .api {
-                    Text(statusHistoryError)
-                        .font(.caption2)
-                        .foregroundStyle(Color.red.opacity(0.82))
-                        .lineLimit(2)
                 }
             }
         }
@@ -352,66 +278,12 @@ struct NetwatchCompactView: View {
         return [0.72, 0.66, 0.78, 0.62, 0.85, 0.70, 0.92, 0.76].map { base * $0 }
     }
 
-    private var statusLegendColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 2)
-    }
-
-    private var statusLegendLevels: [MonitoringLevel] {
-        [.ok, .warning, .critical, .unknown]
-    }
-
-    private var statusHistoryMetadataText: String? {
-        switch viewModel.statusHistorySource {
-        case .api:
-            guard let statusHistory = viewModel.statusHistory else {
-                return nil
-            }
-
-            var parts = ["Bucket: \(statusHistory.bucket)"]
-
-            if let generatedAt = statusHistory.generatedAt {
-                parts.append("Generated: \(formatHistoryTime(generatedAt))")
-            }
-
-            return parts.joined(separator: "  ")
-        case .observed:
-            return "Observed while viewer is running"
-        case .unavailable:
-            return nil
-        }
-    }
-
-    private var statusHistorySummaryText: String? {
-        guard viewModel.statusHistorySource == .api, let summary = viewModel.statusHistory?.summary else {
-            return nil
-        }
-
-        return "OK \(summary.okCount) / WARN \(summary.warningCount) / CRIT \(summary.criticalCount) / UNK \(summary.unknownCount)"
-    }
-
     private func formatNumber(_ value: Double?) -> String {
         guard let value else {
             return "--"
         }
 
         return value.formatted(.number.precision(.fractionLength(0...1)))
-    }
-
-    private func formatHistoryTime(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
-    }
-
-    private func statusLegendLabel(for level: MonitoringLevel) -> String {
-        switch level {
-        case .ok:
-            return "OK"
-        case .warning:
-            return "Warning"
-        case .critical:
-            return "Critical"
-        case .unknown:
-            return "Unknown"
-        }
     }
 }
 
